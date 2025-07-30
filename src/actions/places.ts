@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-location';
 import { createLocationClient, getPlaceIndexName, mapCountryCode, DEFAULT_BIAS_POSITION } from '../utils/aws-client.js';
 import { ExtendedPlace } from '../types/aws-location.js';
+import { detectCountryFromQuery, enhanceResponseWithCountrySuggestions } from '../utils/country-detection.js';
 
 // Define types for our MCP actions
 type SearchPlaceParams = {
@@ -54,6 +55,8 @@ const formatPlace = (place: ExtendedPlace) => {
   };
 };
 
+// Country detection is now handled by the utility in ../utils/country-detection.js
+
 // Places Actions implementation
 export const placeActions = {
   // Search for places by text query
@@ -64,7 +67,17 @@ export const placeActions = {
       
       const { query, country, maxResults = 10, language } = params;
       
-      const filterCountries = country ? [mapCountryCode(country)] : undefined;
+      // If country is not specified, try to detect it from the query
+      let detectedCountry = country;
+      if (!detectedCountry) {
+        const detected = detectCountryFromQuery(query);
+        if (detected) {
+          detectedCountry = detected;
+          console.log(`Detected country from query: ${detected}`);
+        }
+      }
+      
+      const filterCountries = detectedCountry ? [mapCountryCode(detectedCountry)] : undefined;
       
       const command = new SearchPlaceIndexForTextCommand({
         IndexName: placeIndex,
@@ -87,8 +100,15 @@ export const placeActions = {
         };
       }).filter(Boolean);
 
-      const data = { Summary: response.Summary, Results: results };
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      // Enhance response with country suggestions
+      const enhancedData = enhanceResponseWithCountrySuggestions(
+        { Summary: response.Summary, Results: results },
+        query,
+        detectedCountry,
+        country
+      );
+      
+      return { content: [{ type: 'text' as const, text: JSON.stringify(enhancedData, null, 2) }] };
     } catch (error) {
       console.error('Error searching place index for text:', error);
       throw new Error(`Failed to search places: ${(error as Error).message}`);
@@ -137,7 +157,17 @@ export const placeActions = {
       
       const { query, country, maxResults = 10, language } = params;
       
-      const filterCountries = country ? [mapCountryCode(country)] : undefined;
+      // If country is not specified, try to detect it from the query
+      let detectedCountry = country;
+      if (!detectedCountry) {
+        const detected = detectCountryFromQuery(query);
+        if (detected) {
+          detectedCountry = detected;
+          console.log(`Detected country from query: ${detected}`);
+        }
+      }
+      
+      const filterCountries = detectedCountry ? [mapCountryCode(detectedCountry)] : undefined;
       
       const command = new SearchPlaceIndexForSuggestionsCommand({
         IndexName: placeIndex,
@@ -155,8 +185,15 @@ export const placeActions = {
         return { Text: result.Text, PlaceId: result.PlaceId };
       }).filter(Boolean);
 
-      const data = { Summary: response.Summary, Results: results };
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      // Enhance response with country suggestions
+      const enhancedData = enhanceResponseWithCountrySuggestions(
+        { Summary: response.Summary, Results: results },
+        query,
+        detectedCountry,
+        country
+      );
+      
+      return { content: [{ type: 'text' as const, text: JSON.stringify(enhancedData, null, 2) }] };
     } catch (error) {
       console.error('Error searching place index for suggestions:', error);
       throw new Error(`Failed to get place suggestions: ${(error as Error).message}`);
@@ -184,7 +221,14 @@ export const placeActions = {
       }
 
       const data = { Place: formatPlace(response.Place as ExtendedPlace) };
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      
+      // Add a reminder about country codes for future queries
+      const enhancedData = { 
+        ...data,
+        Note: "For place searches, remember to include a country code when possible for more accurate results."
+      };
+      
+      return { content: [{ type: 'text' as const, text: JSON.stringify(enhancedData, null, 2) }] };
     } catch (error) {
       console.error('Error getting place details:', error);
       throw new Error(`Failed to get place details: ${(error as Error).message}`);

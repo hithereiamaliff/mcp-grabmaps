@@ -39,13 +39,21 @@ export default function createStatelessServer({
   server.registerTool(
     'searchPlaceIndexForText',
     {
-      description: 'Search for places using text query',
+      description: `Search for places using text query.
+
+IMPORTANT INSTRUCTION FOR AI MODELS: AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.
+For example:
+- If user asks about "City Square Mall", determine it's in Singapore and use country: "SGP"
+- If user asks about "Songklanagarind Hospital", determine it's in Thailand and use country: "THA"
+This is CRITICAL for returning accurate search results.`,
       inputSchema: {
-        query: z.string().describe('Search query'),
-        country: z.string().optional().describe('Country code filter'),
+        query: z.string().describe('Search query text'),
+        country: z.string()
+          .describe('REQUIRED: Three-letter ISO country code (e.g., "SGP" for Singapore, "MYS" for Malaysia, "THA" for Thailand). AI MODELS MUST ALWAYS INCLUDE THIS PARAMETER.')
+          .optional(), // Technically optional but strongly encouraged
         maxResults: z.number().optional().describe('Maximum results to return'),
         language: z.string().optional().describe('Language code'),
-      },
+      }
     },
     placeActions.searchPlaceIndexForText
   );
@@ -67,13 +75,21 @@ export default function createStatelessServer({
   server.registerTool(
     'searchPlaceIndexForSuggestions',
     {
-      description: 'Get place suggestions based on partial text input',
+      description: `Get place suggestions based on partial text input.
+
+IMPORTANT INSTRUCTION FOR AI MODELS: AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.
+For example:
+- If user asks about "City Square Mall", determine it's in Singapore and use country: "SGP"
+- If user asks about "Songklanagarind Hospital", determine it's in Thailand and use country: "THA"
+This is CRITICAL for returning accurate search results.`,
       inputSchema: {
-        query: z.string().describe('Partial text input'),
-        country: z.string().optional().describe('Country code filter'),
+        query: z.string().describe('Search query text'),
+        country: z.string()
+          .describe('REQUIRED: Three-letter ISO country code (e.g., "SGP" for Singapore, "MYS" for Malaysia, "THA" for Thailand). AI MODELS MUST ALWAYS INCLUDE THIS PARAMETER.')
+          .optional(), // Technically optional but strongly encouraged
         maxResults: z.number().optional().describe('Maximum results to return'),
         language: z.string().optional().describe('Language code'),
-      },
+      }
     },
     placeActions.searchPlaceIndexForSuggestions
   );

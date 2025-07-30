@@ -4,23 +4,27 @@ A Model Context Protocol (MCP) server for GrabMaps API integration, providing ac
 
 ## Features
 
-This MCP server provides comprehensive access to GrabMaps functionality through three main categories:
+This MCP server provides access to GrabMaps functionality through two main categories:
 
-### Places Actions
+### Places Actions (Available via MCP)
 - **SearchPlaceIndexForText**: Forward geocoding to find places by name or address
 - **SearchPlaceIndexForPosition**: Reverse geocoding to find places by coordinates
 - **SearchPlaceIndexForSuggestions**: Get place suggestions as you type
 - **GetPlace**: Retrieve detailed information about a specific place
 
-### Maps Actions
-- **GetMapTile**: Retrieve map tiles for rendering maps
-- **GetMapStyleDescriptor**: Get map style information for customization
-- **GetMapGlyphs**: Get text glyphs for map labels
-- **GetMapSprites**: Get map sprites for icons and markers
-
-### Routes Actions
+### Routes Actions (Available via MCP)
 - **CalculateRoute**: Calculate routes between points with waypoints
 - **CalculateRouteMatrix**: Calculate a matrix of routes between multiple origins and destinations
+
+### Maps Functionality (Requires AWS Console)
+**Note**: Map rendering functionality is not directly available through the MCP server. To view and use maps:
+
+1. Go to the AWS Location Service console
+2. Look for the Maps section and click the "Try it" button
+3. Ensure "Grab" is selected as the provider
+
+To explore GrabMaps data coverage and see the maps in action without logging in to AWS, visit:
+[https://grabmaps.grab.com/explore-data-coverage](https://grabmaps.grab.com/explore-data-coverage)
 
 ## Installation
 
@@ -98,6 +102,29 @@ For the best experience testing Places and Routes APIs, we recommend using the S
 2. Open the Smithery playground at: https://smithery.ai/playground
 3. Connect to your local MCP server: `http://localhost:3000`
 4. Test Places and Routes API calls using the provided examples in [SMITHERY_TESTING.md](./SMITHERY_TESTING.md)
+
+## Important Notes for AI Models
+
+### Country Code Requirements
+
+When using the Places API functions, AI models **MUST** analyze the user's query to determine the appropriate country and include the three-letter ISO country code in all requests:
+
+```json
+{
+  "query": "City Square Mall",
+  "country": "SGP"  // SGP for Singapore, MYS for Malaysia, THA for Thailand, etc.
+}
+```
+
+Examples of country codes:
+- Singapore: SGP
+- Malaysia: MYS
+- Thailand: THA
+- Indonesia: IDN
+- Philippines: PHL
+- Vietnam: VNM
+
+Including the country code is critical for returning accurate search results.
 
 This approach allows you to test the Places and Routes functionality without needing to set up map visualization components.
 

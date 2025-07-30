@@ -7,7 +7,9 @@
   "module": "./dist/smithery.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "prebuild": "node pre-build.js",
     "build": "tsc",
+    "postbuild": "node post-build.js",
     "dev:express": "ts-node src/index.ts",
     "start:express": "node dist/index.js",
     "dev": "npx @smithery/cli dev",

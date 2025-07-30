@@ -2,7 +2,18 @@
 
 A Model Context Protocol (MCP) server for GrabMaps API integration, providing access to GrabMaps services through AWS Location Service.
 
-> **Important**: GrabMaps only supports eight countries in Southeast Asia: Malaysia, Singapore, Thailand, Myanmar, Cambodia, Vietnam, Philippines, and Indonesia. Search requests outside these countries will not return accurate results.
+> **Important**: GrabMaps only supports eight countries in Southeast Asia.
+> 
+> - 🇲🇾 Malaysia (MYS)
+> - 🇸🇬 Singapore (SGP)
+> - 🇹🇭 Thailand (THA)
+> - 🇲🇲 Myanmar (MMR)
+> - 🇰🇭 Cambodia (KHM)
+> - 🇻🇳 Vietnam (VNM)
+> - 🇵🇭 Philippines (PHL)
+> - 🇮🇩 Indonesia (IDN)
+>
+> Search requests outside these countries will not return accurate results.
 
 ## Features
 

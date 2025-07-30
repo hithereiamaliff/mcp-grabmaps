@@ -1,0 +1,63 @@
+{
+  "name": "mcp-grabmaps",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) server for GrabMaps API integration",
+  "type": "module",
+  "main": "dist/smithery.js",
+  "module": "./dist/smithery.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev:express": "ts-node src/index.ts",
+    "start:express": "node dist/index.js",
+    "dev": "npx @smithery/cli dev",
+    "start": "npx @smithery/cli start",
+    "test": "node tests/test-suite.js",
+    "smithery:dev": "npx @smithery/cli dev",
+    "smithery:build": "npx @smithery/cli build",
+    "smithery:deploy": "npx @smithery/cli deploy"
+  },
+  "keywords": [
+    "grabmaps",
+    "mcp",
+    "model-context-protocol",
+    "maps",
+    "geocoding",
+    "routing",
+    "smithery",
+    "aws-location"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-location": "^3.855.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@smithery/sdk": "^1.5.5",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "zod": "^3.23.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hithereiamaliff/mcp-grabmaps.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hithereiamaliff/mcp-grabmaps/issues"
+  },
+  "homepage": "https://github.com/hithereiamaliff/mcp-grabmaps#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "@smithery/cli": "1.2.14",
+    "smithery": "^0.5.2",
+    "tsx": "^4.20.3"
+  }
+}

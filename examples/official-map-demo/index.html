@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GrabMaps Official Integration Demo</title>
+    <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+      body { margin: 0; padding: 0; }
+      #map { position: absolute; top: 0; bottom: 0; width: 70%; }
+      .coordinates {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(255,255,255,0.8);
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 1;
+      }
+      .control-panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 30%;
+        height: 100%;
+        background-color: white;
+        padding: 10px;
+        overflow-y: auto;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+      }
+      .search-results {
+        margin-top: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      /* Tab styles */
+      .tab-container {
+        width: 100%;
+        margin-top: 15px;
+      }
+      .tab-buttons {
+        overflow: hidden;
+        border-bottom: 1px solid #ccc;
+        display: flex;
+      }
+      .tab-button {
+        background-color: #f1f1f1;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 10px;
+        flex: 1;
+        transition: 0.3s;
+        font-size: 14px;
+      }
+      .tab-button:hover {
+        background-color: #ddd;
+      }
+      .tab-button.active {
+        background-color: #3887be;
+        color: white;
+      }
+      .tab-content {
+        display: none;
+        padding: 15px 0;
+        border-top: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      /* Form styles */
+      label {
+        display: block;
+        margin-top: 10px;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input, select, button {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      button {
+        background-color: #3887be;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      button:hover {
+        background-color: #2a6496;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+      }
+      
+      .error {
+        color: red;
+        font-weight: bold;
+        padding: 5px;
+        border-left: 3px solid red;
+        background-color: rgba(255, 0, 0, 0.05);
+      }
+      .map-components-container {
+        margin-top: 10px;
+      }
+      h4, h5 {
+        margin-top: 15px;
+        margin-bottom: 10px;
+      }
+      hr {
+        margin: 15px 0;
+        border: 0;
+        border-top: 1px solid #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div class="coordinates" id="coordinates"></div>
+    <div class="control-panel">
+      <h3>GrabMaps Official Demo</h3>
+      
+      <div class="tab-container">
+        <div class="tab-buttons">
+          <button class="tab-button active" onclick="openTab(event, 'setup-tab')">Setup</button>
+          <button class="tab-button" onclick="openTab(event, 'places-tab')">Places</button>
+          <button class="tab-button" onclick="openTab(event, 'maps-tab')">Maps</button>
+          <button class="tab-button" onclick="openTab(event, 'routes-tab')">Routes</button>
+        </div>
+        
+        <!-- Setup Tab -->
+        <div id="setup-tab" class="tab-content active">
+          <label for="api-key">API Key:</label>
+          <input type="text" id="api-key" placeholder="Enter your GrabMaps API key">
+          
+          <label for="region">Region:</label>
+          <select id="region">
+            <option value="ap-southeast-5">Malaysia (ap-southeast-5)</option>
+            <option value="ap-southeast-1">Singapore (ap-southeast-1)</option>
+          </select>
+          
+          <label for="map-name">Map Name:</label>
+          <input type="text" id="map-name" value="explore.map.Grab" placeholder="Map resource name">
+          
+          <label for="place-index-name">Place Index Name:</label>
+          <input type="text" id="place-index-name" value="explore.place.Grab" placeholder="Place index resource name">
+          
+          <label for="route-calculator-name">Route Calculator Name:</label>
+          <input type="text" id="route-calculator-name" value="explore.route-calculator.Grab" placeholder="Route calculator resource name">
+          
+          <button id="initialize-map">Initialize Map</button>
+          <p><small>Note: Map will use official GrabMaps tiles via AWS Location Service</small></p>
+        </div>
+        
+        <!-- Places Tab -->
+        <div id="places-tab" class="tab-content">
+          <h4>Search Places</h4>
+          <input type="text" id="search-input" placeholder="Enter a place name">
+          <button id="search-button">Search</button>
+          
+          <div id="search-results" class="search-results"></div>
+          
+          <hr>
+          <h4>Reverse Geocoding</h4>
+          <p><small>Click anywhere on the map to find places at that location</small></p>
+          <div id="reverse-geocode-results" class="search-results"></div>
+          
+          <hr>
+          <h4>Place Details</h4>
+          <div id="place-details"></div>
+        </div>
+        
+        <!-- Maps Tab -->
+        <div id="maps-tab" class="tab-content">
+          <h4>Map Components</h4>
+          <div class="map-components-container">
+            <h5>Style Descriptor</h5>
+            <button id="test-style-descriptor">Test Style Descriptor</button>
+            <div id="style-descriptor-result"></div>
+            
+            <h5>Map Tile</h5>
+            <p><small>Test fetching a specific map tile</small></p>
+            <div>
+              <label for="tile-z">Zoom level (z):</label>
+              <input type="number" id="tile-z" value="15" min="0" max="20">
+            </div>
+            <div>
+              <label for="tile-x">Tile X:</label>
+              <input type="number" id="tile-x" value="25905" min="0">
+            </div>
+            <div>
+              <label for="tile-y">Tile Y:</label>
+              <input type="number" id="tile-y" value="14333" min="0">
+            </div>
+            <button id="test-map-tile">Test Map Tile</button>
+            <div id="map-tile-result"></div>
+            
+            <h5>Map Sprites</h5>
+            <button id="test-map-sprites">Test Map Sprites</button>
+            <div id="map-sprites-result"></div>
+            
+            <h5>Map Glyphs</h5>
+            <div>
+              <label for="font-stack">Font Stack:</label>
+              <select id="font-stack">
+                <option value="Amazon Ember Regular,Noto Sans Regular">Amazon Ember Regular</option>
+                <option value="Amazon Ember Bold,Noto Sans Bold">Amazon Ember Bold</option>
+                <option value="Amazon Ember Medium,Noto Sans Medium">Amazon Ember Medium</option>
+                <option value="Amazon Ember Regular Italic,Noto Sans Italic">Amazon Ember Regular Italic</option>
+                <option value="Amazon Ember Condensed RC Regular,Noto Sans Regular">Amazon Ember Condensed RC Regular</option>
+              </select>
+            </div>
+            <div>
+              <label for="font-range">Unicode Range:</label>
+              <input type="text" id="font-range" value="0-255" placeholder="e.g. 0-255">
+              <small>(Will be formatted as required)</small>
+            </div>
+            <button id="test-map-glyphs">Test Map Glyphs</button>
+            <div id="map-glyphs-result"></div>
+          </div>
+        </div>
+        
+        <!-- Routes Tab -->
+        <div id="routes-tab" class="tab-content">
+          <h4>Calculate Route</h4>
+          <p><small>Search for places and click on two locations to calculate a route</small></p>
+          
+          <div class="route-info" id="route-info" style="display: none;">
+            <h5>Route Information</h5>
+            <div id="route-details"></div>
+            <button id="clear-route">Clear Route</button>
+          </div>
+          
+          <hr>
+          <h4>Route Matrix</h4>
+          <p><small>Calculate travel times between multiple origins and destinations</small></p>
+          <button id="test-route-matrix">Test Route Matrix</button>
+          <div id="route-matrix-result"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+    <script>
+      // Tab functionality
+      function openTab(evt, tabName) {
+        // Hide all tab content
+        const tabContents = document.getElementsByClassName("tab-content");
+        for (let i = 0; i < tabContents.length; i++) {
+          tabContents[i].classList.remove("active");
+        }
+        
+        // Remove active class from all tab buttons
+        const tabButtons = document.getElementsByClassName("tab-button");
+        for (let i = 0; i < tabButtons.length; i++) {
+          tabButtons[i].classList.remove("active");
+        }
+        
+        // Show the selected tab content and mark button as active
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+      }
+      
+      // Default values
+      let defaultApiKey = "v1.public.eyJqdGkiOiJmYzkxMjE2NS1kY2ZlLTRlNDgtODhhNC00MTllYzdjZmY3ZTkifT-UshJK5jG1JYpvdS7TPh4yHfohpRnPF0yo8ULkCKNy1CvnsJbFjEGzKT6FAQzIOTE_JBidTXhEbIsctFrrP3wGhHLJwvQgR7XG9li4RElOvWs9ZKPzGn0FRBr3cBwLXoVHvqef2wMv6nXepVICsLrYRs_MkAZQb0-Bv46nA__nq4y5y2VdCUFXXXLXK9YCrGnEvZqnnj_4uvggzxxwv3n-JDFaQUG-HXS-iAq1HP7hRMiZeVSpp_J7vQqPr9rpVl1kCTk0PZKi0cX5hG5RB7z5UCVwabVbXFCLrBLjeswQGLc9RDa5oJDuNF3a4sUlk7T-bky3FUyBYKw5z6qEz8A.MDgwYWE2NDctYWYyMy00NzU1LTk5ODMtOTZiZDUyY2FiNjdl";
+      let defaultMapName = "explore.map.Grab";
+      let defaultRegion = "ap-southeast-5";
+      let defaultPlaceIndexName = "explore.place.Grab";
+      let defaultRouteCalculatorName = "explore.route-calculator.Grab";
+      
+      // Initial center coordinates (Kuala Lumpur)
+      const INITIAL_CENTER = [101.6942371, 3.1516964];
+      const INITIAL_ZOOM = 11;
+      
+      // MCP server URL
+      const MCP_SERVER_URL = 'http://localhost:3000';
+      
+      // Global variables
+      let map = null;
+      let markers = [];
+      let routeSource = null;
+      let routeLayer = null;
+      
+      // Fill form fields with defaults
+      document.getElementById('api-key').value = defaultApiKey;
+      document.getElementById('map-name').value = defaultMapName;
+      document.getElementById('region').value = defaultRegion;
+      document.getElementById('place-index-name').value = defaultPlaceIndexName;
+      document.getElementById('route-calculator-name').value = defaultRouteCalculatorName;
+      
+      // Initialize map button click handler
+      document.getElementById('initialize-map').addEventListener('click', initializeMap);
+      
+      // Initialize map function
+      function initializeMap() {
+        // Get values from form
+        const apiKey = document.getElementById('api-key').value || defaultApiKey;
+        const mapName = document.getElementById('map-name').value || defaultMapName;
+        const region = document.getElementById('region').value || defaultRegion;
+        
+        // Remove existing map if it exists
+        if (map) {
+          map.remove();
+        }
+        
+        // Clear any existing markers
+        clearMarkers();
+        
+        // Initialize the map
+        map = new maplibregl.Map({
+          container: "map",
+          style: `https://maps.geo.${region}.amazonaws.com/maps/v0/maps/${mapName}/style-descriptor?key=${apiKey}`,
+          center: INITIAL_CENTER,
+          zoom: INITIAL_ZOOM,
+        });
+        
+        // Add navigation controls
+        map.addControl(new maplibregl.NavigationControl(), "top-left");
+        
+        // Display coordinates
+        map.on('mousemove', function(e) {
+          const coords = document.getElementById('coordinates');
+          coords.innerHTML = `Longitude: ${e.lngLat.lng.toFixed(6)} | Latitude: ${e.lngLat.lat.toFixed(6)}`;
+        });
+        
+        // Handle click for reverse geocoding
+        map.on('click', function(e) {
+          // Add a marker at click location
+          const clickMarker = new maplibregl.Marker({color: '#ff0000'})
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .addTo(map);
+          
+          markers.push(clickMarker);
+          
+          // Perform reverse geocoding
+          reverseGeocode(e.lngLat.lng, e.lngLat.lat);
+          
+          // Switch to Places tab
+          openTab({currentTarget: document.querySelector('button[onclick="openTab(event, \'places-tab\')"]')}, 'places-tab');
+        });
+        
+        // Wait for map to load
+        map.on('load', function() {
+          // Add a source for route lines
+          map.addSource('route', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'LineString',
+                coordinates: []
+              }
+            }
+          });
+          
+          routeSource = map.getSource('route');
+          
+          // Add a layer for route lines
+          map.addLayer({
+            id: 'route',
+            type: 'line',
+            source: 'route',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#3887be',
+              'line-width': 5,
+              'line-opacity': 0.75
+            }
+          });
+          
+          routeLayer = 'route';
+          
+          // Enable buttons
+          document.getElementById('search-button').disabled = false;
+          document.getElementById('test-style-descriptor').disabled = false;
+          document.getElementById('test-map-tile').disabled = false;
+          document.getElementById('test-map-sprites').disabled = false;
+          document.getElementById('test-map-glyphs').disabled = false;
+          document.getElementById('test-route-matrix').disabled = false;
+          
+          // Success message
+          alert('Map initialized successfully! You can now use all features.');
+        });
+        
+        // Set up event handlers for all buttons
+        setupEventHandlers();
+      }
+      
+      // Setup all event handlers
+      function setupEventHandlers() {
+        // Places tab
+        document.getElementById('search-button').addEventListener('click', searchPlaces);
+        
+        // Maps tab
+        document.getElementById('test-style-descriptor').addEventListener('click', testStyleDescriptor);
+        document.getElementById('test-map-tile').addEventListener('click', testMapTile);
+        document.getElementById('test-map-sprites').addEventListener('click', testMapSprites);
+        document.getElementById('test-map-glyphs').addEventListener('click', testMapGlyphs);
+        
+        // Routes tab
+        document.getElementById('clear-route').addEventListener('click', clearRoute);
+        document.getElementById('test-route-matrix').addEventListener('click', testRouteMatrix);
+      }
+      
+      // Search places function
+      async function searchPlaces() {
+        const query = document.getElementById('search-input').value.trim();
+        if (!query) return;
+        
+        try {
+          const placeIndexName = document.getElementById('place-index-name').value;
+          console.log(`Searching places with query: ${query}, endpoint: ${MCP_SERVER_URL}/searchPlaceIndexForText`);
+          
+          const response = await fetch(`${MCP_SERVER_URL}/searchPlaceIndexForText`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              query,
+              maxResults: 10
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          displaySearchResults(data.results || []);
+        } catch (error) {
+          console.error('Error searching places:', error);
+          document.getElementById('search-results').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Reverse geocode function
+      async function reverseGeocode(longitude, latitude) {
+        try {
+          const placeIndexName = document.getElementById('place-index-name').value;
+          console.log(`Reverse geocoding at: ${longitude}, ${latitude}, endpoint: ${MCP_SERVER_URL}/searchPlaceIndexForPosition`);
+          
+          const response = await fetch(`${MCP_SERVER_URL}/searchPlaceIndexForPosition`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              longitude: longitude,
+              latitude: latitude,
+              maxResults: 3,
+              placeIndexName: placeIndexName
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          displayReverseGeocodeResults(data.results);
+        } catch (error) {
+          console.error('Error reverse geocoding:', error);
+          document.getElementById('reverse-geocode-results').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Display reverse geocode results
+      function displayReverseGeocodeResults(results) {
+        const resultsContainer = document.getElementById('reverse-geocode-results');
+        resultsContainer.innerHTML = '';
+        
+        if (!results || results.length === 0) {
+          resultsContainer.innerHTML = '<p>No results found</p>';
+          return;
+        }
+        
+        const ul = document.createElement('ul');
+        ul.style.listStyle = 'none';
+        ul.style.padding = '0';
+        
+        results.forEach((result) => {
+          const li = document.createElement('li');
+          li.style.padding = '5px 0';
+          li.style.borderBottom = '1px solid #eee';
+          li.style.cursor = 'pointer';
+          
+          li.innerHTML = `<strong>${result.name}</strong><br><small>${result.distance ? result.distance.toFixed(2) + ' m away' : ''}</small>`;
+          
+          li.addEventListener('click', () => {
+            getPlaceDetails(result.placeId);
+          });
+          
+          ul.appendChild(li);
+        });
+        
+        resultsContainer.appendChild(ul);
+      }
+      
+      // Get place details
+      async function getPlaceDetails(placeId) {
+        try {
+          const placeIndexName = document.getElementById('place-index-name').value;
+          
+          const response = await fetch(`${MCP_SERVER_URL}/getPlace`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              placeId: placeId,
+              placeIndexName: placeIndexName
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          displayPlaceDetails(data);
+        } catch (error) {
+          console.error('Error getting place details:', error);
+          document.getElementById('place-details').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Display place details
+      function displayPlaceDetails(place) {
+        const detailsContainer = document.getElementById('place-details');
+        
+        let addressStr = '';
+        if (place.address) {
+          addressStr = `<p><strong>Address:</strong> ${place.address}</p>`;
+        }
+        
+        detailsContainer.innerHTML = `
+          <div style="padding: 10px; background: #f0f0f0; border-radius: 4px;">
+            <h5>${place.name}</h5>
+            ${addressStr}
+            <p><strong>Coordinates:</strong> ${place.coordinates.latitude}, ${place.coordinates.longitude}</p>
+            <p><strong>Place ID:</strong> ${place.placeId}</p>
+          </div>
+        `;
+      }
+      
+      // Display search results
+      function displaySearchResults(results) {
+        // Clear existing markers
+        clearMarkers();
+        
+        const resultsContainer = document.getElementById('search-results');
+        resultsContainer.innerHTML = '';
+        
+        if (!results || results.length === 0) {
+          resultsContainer.innerHTML = '<p>No results found</p>';
+          return;
+        }
+        
+        const ul = document.createElement('ul');
+        ul.style.listStyle = 'none';
+        ul.style.padding = '0';
+        
+        results.forEach((result, index) => {
+          // Create marker for each result
+          const marker = new maplibregl.Marker()
+            .setLngLat([result.coordinates.longitude, result.coordinates.latitude])
+            .addTo(map);
+          
+          markers.push(marker);
+          
+          // Create list item for each result
+          const listItem = document.createElement('li');
+          listItem.style.padding = '5px 0';
+          listItem.style.borderBottom = '1px solid #eee';
+          listItem.style.cursor = 'pointer';
+          
+          // Format address properly to avoid [object Object] display
+          let addressText = '';
+          if (result.address) {
+            if (typeof result.address === 'string') {
+              addressText = result.address;
+            } else if (typeof result.address === 'object') {
+              // Try to extract meaningful address information
+              addressText = JSON.stringify(result.address)
+                .replace(/[{}",]/g, '')
+                .replace(/:/g, ': ')
+                .replace(/\\n/g, '<br>');
+            }
+          }
+          
+          listItem.innerHTML = `<strong>${result.name}</strong><br><small>${addressText}</small>`;
+          
+          // Add click handler to select this place
+          listItem.addEventListener('click', () => {
+            selectPlace(result);
+          });
+          
+          ul.appendChild(listItem);
+        });
+        
+        resultsContainer.appendChild(ul);
+        
+        // Fit map to markers
+        if (markers.length > 0) {
+          const bounds = new maplibregl.LngLatBounds();
+          markers.forEach(marker => bounds.extend(marker.getLngLat()));
+          map.fitBounds(bounds, { padding: 100 });
+        }
+      }
+      
+      // Selected places for route calculation
+      let selectedPlaces = [];
+      
+      // Select a place for route calculation
+      function selectPlace(place) {
+        console.log('Selecting place:', place);
+        
+        // Add to selected places (max 2)
+        if (selectedPlaces.length < 2) {
+          selectedPlaces.push(place);
+        } else {
+          // Clear existing route before replacing places
+          clearRoute();
+          // Start fresh with this place
+          selectedPlaces = [place];
+        }
+        
+        // Add a marker for this place if not already added
+        const placeCoords = [place.coordinates.longitude, place.coordinates.latitude];
+        const markerExists = markers.some(marker => {
+          const lngLat = marker.getLngLat();
+          return lngLat.lng === placeCoords[0] && lngLat.lat === placeCoords[1];
+        });
+        
+        if (!markerExists) {
+          // Add a marker for this place
+          const marker = new maplibregl.Marker({
+            color: selectedPlaces.length === 1 ? '#33cc33' : '#3366ff' // Green for origin, blue for destination
+          })
+            .setLngLat(placeCoords)
+            .addTo(map);
+          
+          markers.push(marker);
+        }
+        
+        // If we have 2 places, calculate route
+        if (selectedPlaces.length === 2) {
+          calculateRoute(selectedPlaces[0], selectedPlaces[1]);
+          // Switch to Routes tab
+          openTab({currentTarget: document.querySelector('button[onclick="openTab(event, \'routes-tab\')"]')}, 'routes-tab');
+        }
+      }
+      
+      // Calculate route between two places
+      async function calculateRoute(origin, destination) {
+        try {
+          // Show loading indicator
+          document.getElementById('route-details').innerHTML = '<p>Calculating route...</p>';
+          document.getElementById('route-info').style.display = 'block';
+          
+          const routeCalculatorName = document.getElementById('route-calculator-name').value;
+          console.log(`Calculating route from ${origin.coordinates.longitude},${origin.coordinates.latitude} to ${destination.coordinates.longitude},${destination.coordinates.latitude}, endpoint: ${MCP_SERVER_URL}/calculateRoute, routeCalculatorName: ${routeCalculatorName}`);
+          
+          // Clear any existing route on the map before calculating a new one
+          if (routeSource) {
+            routeSource.setData({
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'LineString',
+                coordinates: []
+              }
+            });
+          }
+          
+          const response = await fetch(`${MCP_SERVER_URL}/calculateRoute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              departurePosition: [origin.coordinates.longitude, origin.coordinates.latitude],
+              destinationPosition: [destination.coordinates.longitude, destination.coordinates.latitude],
+              travelMode: 'Car',
+              routeCalculatorName: routeCalculatorName
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          
+          // Validate route data
+          if (!data || !data.legs || data.legs.length === 0) {
+            throw new Error('Invalid route data: No route legs found');
+          }
+          
+          // Check if any legs have geometry
+          let hasValidGeometry = false;
+          for (const leg of data.legs) {
+            if (leg.geometry && leg.geometry.lineString && leg.geometry.lineString.length > 0) {
+              hasValidGeometry = true;
+              break;
+            }
+          }
+          
+          if (!hasValidGeometry) {
+            throw new Error('No valid route geometry found between these locations');
+          }
+          
+          displayRoute(data);
+        } catch (error) {
+          console.error('Error calculating route:', error);
+          document.getElementById('route-details').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+          document.getElementById('route-info').style.display = 'block';
+        }
+      }
+      
+      // Display route on map
+      function displayRoute(routeData) {
+        // Show route info panel
+        document.getElementById('route-info').style.display = 'block';
+        
+        // Update route source with new coordinates
+        if (routeSource && routeData.legs && routeData.legs.length > 0) {
+          const coordinates = [];
+          
+          routeData.legs.forEach(leg => {
+            if (leg.geometry && leg.geometry.lineString) {
+              coordinates.push(...leg.geometry.lineString);
+            }
+          });
+          
+          console.log(`Route has ${coordinates.length} coordinate points`);
+          
+          if (coordinates.length === 0) {
+            document.getElementById('route-details').innerHTML = `<p class="error">Error: No valid route found between these locations</p>`;
+            return;
+          }
+          
+          routeSource.setData({
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: coordinates
+            }
+          });
+          
+          // Display route details
+          const distanceKm = routeData.summary.distance / 1000;
+          const durationMin = routeData.summary.durationSeconds / 60;
+          
+          document.getElementById('route-details').innerHTML = `
+            <p><strong>Distance:</strong> ${distanceKm.toFixed(2)} km</p>
+            <p><strong>Duration:</strong> ${durationMin.toFixed(0)} minutes</p>
+            <p><strong>Origin:</strong> ${selectedPlaces[0].name || 'Selected location'}</p>
+            <p><strong>Destination:</strong> ${selectedPlaces[1].name || 'Selected location'}</p>
+          `;
+          
+          // Fit map to route
+          const bounds = new maplibregl.LngLatBounds();
+          coordinates.forEach(coord => bounds.extend(coord));
+          map.fitBounds(bounds, { padding: 100 });
+        } else {
+          document.getElementById('route-details').innerHTML = `<p class="error">Error: Invalid route data received</p>`;
+        }
+      }
+      
+      // Test route matrix calculation
+      async function testRouteMatrix() {
+        try {
+          let origins = [];
+          let destinations = [];
+          
+          // Check if we have markers on the map to use as origins/destinations
+          if (markers.length >= 2) {
+            // Use the first marker as origin 1
+            const origin1 = markers[0].getLngLat();
+            origins.push([origin1.lng, origin1.lat]);
+            
+            // Use the second marker as origin 2 or destination 1
+            const point2 = markers[1].getLngLat();
+            
+            if (markers.length >= 3) {
+              // If we have 3+ markers, use second as origin 2 and third as destination 1
+              origins.push([point2.lng, point2.lat]);
+              
+              const dest1 = markers[2].getLngLat();
+              destinations.push([dest1.lng, dest1.lat]);
+              
+              // If we have a fourth marker, use it as destination 2
+              if (markers.length >= 4) {
+                const dest2 = markers[3].getLngLat();
+                destinations.push([dest2.lng, dest2.lat]);
+              } else {
+                // Otherwise create a nearby point as destination 2
+                destinations.push([dest1.lng + 0.01, dest1.lat - 0.01]);
+              }
+            } else {
+              // If we only have 2 markers, use second as destination 1
+              destinations.push([point2.lng, point2.lat]);
+              // Create a nearby point as destination 2
+              destinations.push([point2.lng + 0.01, point2.lat - 0.01]);
+              // Create a nearby point as origin 2
+              origins.push([origin1.lng - 0.01, origin1.lat + 0.01]);
+            }
+          } else {
+            // Fallback to default test locations if no markers
+            origins = [
+              [101.6942, 3.1516], // KLCC
+              [101.6867, 3.1577]  // KL Tower
+            ];
+            
+            destinations = [
+              [101.7068, 3.1587], // National Museum
+              [101.6983, 3.1349]  // KL Sentral
+            ];
+          }
+          
+          // Add debug information to the UI before making the request
+          const debugContainer = document.getElementById('route-matrix-result');
+          debugContainer.innerHTML = '<h5>Route Matrix Results</h5>';
+          debugContainer.innerHTML += '<p>Calculating route matrix...</p>';
+          
+          const debugInfo = document.createElement('div');
+          debugInfo.style.marginBottom = '10px';
+          debugInfo.style.fontSize = '12px';
+          debugInfo.style.color = '#666';
+          
+          debugInfo.innerHTML = '<strong>Debug Info (Request):</strong><br>';
+          debugInfo.innerHTML += '<strong>Origins:</strong><br>';
+          origins.forEach((origin, i) => {
+            debugInfo.innerHTML += `Origin ${i+1}: [${origin[0]}, ${origin[1]}]<br>`;
+          });
+          
+          debugInfo.innerHTML += '<strong>Destinations:</strong><br>';
+          destinations.forEach((dest, i) => {
+            debugInfo.innerHTML += `Destination ${i+1}: [${dest[0]}, ${dest[1]}]<br>`;
+          });
+          
+          debugContainer.appendChild(debugInfo);
+          
+          const routeCalculatorName = document.getElementById('route-calculator-name').value;
+          console.log(`Calculating route matrix with ${origins.length} origins and ${destinations.length} destinations, endpoint: ${MCP_SERVER_URL}/calculateRouteMatrix, routeCalculatorName: ${routeCalculatorName}`);
+          
+          const response = await fetch(`${MCP_SERVER_URL}/calculateRouteMatrix`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              departurePositions: origins,
+              destinationPositions: destinations,
+              travelMode: 'Car',
+              routeCalculatorName: routeCalculatorName
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          displayRouteMatrix(data, origins, destinations);
+        } catch (error) {
+          console.error('Error calculating route matrix:', error);
+          document.getElementById('route-matrix-result').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Display route matrix results
+      function displayRouteMatrix(matrixData, origins, destinations) {
+        const container = document.getElementById('route-matrix-result');
+        container.innerHTML = '<h5>Route Matrix Results</h5>';
+        
+        console.log('Route matrix data:', matrixData);
+        console.log('Origins:', origins);
+        console.log('Destinations:', destinations);
+        
+        // Add debug information
+        const debugInfo = document.createElement('div');
+        debugInfo.style.marginBottom = '10px';
+        debugInfo.style.fontSize = '12px';
+        debugInfo.style.color = '#666';
+        
+        // Show coordinates used for calculation
+        debugInfo.innerHTML = '<strong>Debug Info (Response):</strong><br>';
+        debugInfo.innerHTML += '<strong>Origins:</strong><br>';
+        origins.forEach((origin, i) => {
+          debugInfo.innerHTML += `Origin ${i+1}: [${origin[0]}, ${origin[1]}]<br>`;
+        });
+        
+        debugInfo.innerHTML += '<strong>Destinations:</strong><br>';
+        destinations.forEach((dest, i) => {
+          debugInfo.innerHTML += `Destination ${i+1}: [${dest[0]}, ${dest[1]}]<br>`;
+        });
+        
+        // Add response status
+        if (matrixData && matrixData.routeMatrix && Array.isArray(matrixData.routeMatrix)) {
+          debugInfo.innerHTML += `<strong>Response Status:</strong> Success (${matrixData.routeMatrix.length} origin rows)<br>`;
+        } else {
+          debugInfo.innerHTML += '<strong>Response Status:</strong> <span style="color: red;">Error - Invalid or empty response</span><br>';
+        }
+        
+        container.appendChild(debugInfo);
+        
+        if (!matrixData || !matrixData.routeMatrix || !Array.isArray(matrixData.routeMatrix)) {
+          container.innerHTML += '<p style="color: red;">No valid matrix data available. Check console for details.</p>';
+          return;
+        }
+        
+        // Create table
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginTop = '10px';
+        
+        // Create header row
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = '<th>Origin → Destination</th>';
+        
+        for (let i = 0; i < destinations.length; i++) {
+          const th = document.createElement('th');
+          th.textContent = `Dest ${i+1}`;
+          th.style.padding = '5px';
+          th.style.border = '1px solid #ddd';
+          headerRow.appendChild(th);
+        }
+        
+        table.appendChild(headerRow);
+        
+        // Create data rows
+        for (let i = 0; i < origins.length; i++) {
+          const row = document.createElement('tr');
+          
+          const originCell = document.createElement('td');
+          originCell.textContent = `Origin ${i+1}`;
+          originCell.style.padding = '5px';
+          originCell.style.border = '1px solid #ddd';
+          originCell.style.fontWeight = 'bold';
+          row.appendChild(originCell);
+          
+          // Check if this origin has data
+          if (i >= matrixData.routeMatrix.length || !Array.isArray(matrixData.routeMatrix[i])) {
+            for (let j = 0; j < destinations.length; j++) {
+              const cell = document.createElement('td');
+              cell.textContent = 'No data';
+              cell.style.padding = '5px';
+              cell.style.border = '1px solid #ddd';
+              cell.style.textAlign = 'center';
+              row.appendChild(cell);
+            }
+          } else {
+            // Add cells for each destination
+            for (let j = 0; j < destinations.length; j++) {
+              const cell = document.createElement('td');
+              
+              // Check if we have data for this destination
+              if (j < matrixData.routeMatrix[i].length) {
+                const routeInfo = matrixData.routeMatrix[i][j];
+                
+                if (routeInfo && routeInfo.distance !== undefined && routeInfo.distance !== null) {
+                  const distance = (routeInfo.distance / 1000).toFixed(2);
+                  const duration = ((routeInfo.durationSeconds || routeInfo.duration) / 60).toFixed(0);
+                  cell.innerHTML = `${distance} km<br>${duration} min`;
+                } else if (routeInfo && routeInfo.error) {
+                  cell.innerHTML = `<span style="color: red;">Error: ${routeInfo.error.code || routeInfo.error.message || 'Unknown'}</span>`;
+                } else {
+                  cell.innerHTML = `<span style="color: red;">Error: Unknown</span>`;
+                }
+              } else {
+                cell.textContent = 'N/A';
+              }
+              
+              cell.style.padding = '5px';
+              cell.style.border = '1px solid #ddd';
+              cell.style.textAlign = 'center';
+              row.appendChild(cell);
+            }
+          }
+          
+          table.appendChild(row);
+        }
+        
+        container.appendChild(table);
+        
+        // Add origin/destination coordinates info
+        const coordInfo = document.createElement('div');
+        coordInfo.style.marginTop = '10px';
+        coordInfo.style.fontSize = '12px';
+        
+        let originsText = '<p><strong>Origins:</strong><br>';
+        origins.forEach((coord, i) => {
+          originsText += `Origin ${i+1}: [${coord[0].toFixed(4)}, ${coord[1].toFixed(4)}]<br>`;
+        });
+        originsText += '</p>';
+        
+        let destsText = '<p><strong>Destinations:</strong><br>';
+        destinations.forEach((coord, i) => {
+          destsText += `Destination ${i+1}: [${coord[0].toFixed(4)}, ${coord[1].toFixed(4)}]<br>`;
+        });
+        destsText += '</p>';
+        
+        coordInfo.innerHTML = originsText + destsText;
+        container.appendChild(coordInfo);
+      }
+      
+      // Test map style descriptor
+      async function testStyleDescriptor() {
+        try {
+          const mapName = document.getElementById('map-name').value;
+          console.log(`Testing style descriptor for map: ${mapName}, endpoint: ${MCP_SERVER_URL}/getMapStyleDescriptor`);
+          
+          const response = await fetch(`${MCP_SERVER_URL}/getMapStyleDescriptor`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mapName: mapName
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          displayStyleDescriptor(data);
+        } catch (error) {
+          console.error('Error getting style descriptor:', error);
+          document.getElementById('style-descriptor-result').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Display style descriptor
+      function displayStyleDescriptor(styleData) {
+        const container = document.getElementById('style-descriptor-result');
+        
+        // Create a formatted JSON display
+        const pre = document.createElement('pre');
+        pre.style.maxHeight = '200px';
+        pre.style.overflow = 'auto';
+        pre.style.background = '#f5f5f5';
+        pre.style.padding = '10px';
+        pre.style.borderRadius = '4px';
+        pre.style.fontSize = '12px';
+        
+        // Format the JSON with indentation
+        pre.textContent = JSON.stringify(styleData, null, 2);
+        
+        container.innerHTML = '';
+        container.appendChild(pre);
+      }
+      
+      // Test map tile
+      async function testMapTile() {
+        try {
+          const mapName = document.getElementById('map-name').value;
+          let z = parseInt(document.getElementById('tile-z').value);
+          let x = parseInt(document.getElementById('tile-x').value);
+          let y = parseInt(document.getElementById('tile-y').value);
+          
+          // Validate inputs
+          if (isNaN(z) || isNaN(x) || isNaN(y)) {
+            throw new Error('Tile coordinates must be valid numbers');
+          }
+          
+          // Ensure zoom level doesn't exceed maximum (14 for VectorGrabStandardLight)
+          const MAX_ZOOM = 14;
+          if (z > MAX_ZOOM) {
+            console.warn(`Zoom level ${z} exceeds maximum of ${MAX_ZOOM}. Limiting to ${MAX_ZOOM}.`);
+            z = MAX_ZOOM;
+            document.getElementById('tile-z').value = MAX_ZOOM;
+          }
+          
+          // Validate X and Y coordinates based on zoom level
+          // For zoom level z, valid X and Y values are 0 to 2^z-1
+          const maxCoord = Math.pow(2, z) - 1;
+          
+          // Auto-correct X and Y if they're out of range
+          if (x < 0) {
+            x = 0;
+            document.getElementById('tile-x').value = 0;
+          } else if (x > maxCoord) {
+            x = maxCoord;
+            document.getElementById('tile-x').value = maxCoord;
+            console.warn(`X coordinate adjusted to maximum value: ${maxCoord}`);
+          }
+          
+          if (y < 0) {
+            y = 0;
+            document.getElementById('tile-y').value = 0;
+          } else if (y > maxCoord) {
+            y = maxCoord;
+            document.getElementById('tile-y').value = maxCoord;
+            console.warn(`Y coordinate adjusted to maximum value: ${maxCoord}`);
+          }
+          
+          console.log(`Getting map tile with z: ${z}, x: ${x}, y: ${y}, mapName: ${mapName}`);
+          
+          const response = await fetch(`${MCP_SERVER_URL}/getMapTile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mapName: mapName,
+              z: z,
+              x: x,
+              y: y
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          displayMapTile(data);
+        } catch (error) {
+          console.error('Error getting map tile:', error);
+          document.getElementById('map-tile-result').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Display map tile
+      function displayMapTile(tileData) {
+        const container = document.getElementById('map-tile-result');
+        container.innerHTML = '';
+        
+        if (tileData && tileData.blob) {
+          // Create an image from the base64 blob
+          const img = document.createElement('img');
+          img.src = `data:image/png;base64,${tileData.blob}`;
+          img.style.maxWidth = '100%';
+          img.style.border = '1px solid #ddd';
+          img.style.borderRadius = '4px';
+          
+          container.appendChild(img);
+        } else {
+          container.innerHTML = '<p>No tile data available</p>';
+        }
+      }
+      
+      // Test map sprites
+      async function testMapSprites() {
+        try {
+          const mapName = document.getElementById('map-name').value;
+          console.log(`Testing map sprites for map: ${mapName}, endpoint: ${MCP_SERVER_URL}/getMapSprites`);
+          
+          const response = await fetch(`${MCP_SERVER_URL}/getMapSprites`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mapName: mapName,
+              fileName: 'sprites.png'
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          displayMapSprites(data);
+        } catch (error) {
+          console.error('Error getting map sprites:', error);
+          document.getElementById('map-sprites-result').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Display map sprites
+      function displayMapSprites(spriteData) {
+        const container = document.getElementById('map-sprites-result');
+        container.innerHTML = '';
+        
+        if (spriteData && spriteData.blob) {
+          // Create an image from the base64 blob
+          const img = document.createElement('img');
+          img.src = `data:image/png;base64,${spriteData.blob}`;
+          img.style.maxWidth = '100%';
+          img.style.border = '1px solid #ddd';
+          img.style.borderRadius = '4px';
+          
+          container.appendChild(img);
+          
+          // If we have sprite JSON data, display it
+          if (spriteData.json) {
+            const pre = document.createElement('pre');
+            pre.style.maxHeight = '150px';
+            pre.style.overflow = 'auto';
+            pre.style.background = '#f5f5f5';
+            pre.style.padding = '10px';
+            pre.style.borderRadius = '4px';
+            pre.style.fontSize = '12px';
+            pre.style.marginTop = '10px';
+            
+            // Format the JSON with indentation
+            pre.textContent = JSON.stringify(spriteData.json, null, 2);
+            
+            container.appendChild(pre);
+          }
+        } else {
+          container.innerHTML = '<p>No sprite data available</p>';
+        }
+      }
+      
+      // Test map glyphs
+      async function testMapGlyphs() {
+        try {
+          const mapName = document.getElementById('map-name').value;
+          const fontStack = document.getElementById('font-stack').value || 'Arial Unicode MS';
+          const unicodeRange = document.getElementById('font-range').value || '0-255';
+          
+          if (!fontStack || !unicodeRange) {
+            throw new Error('Font stack and Unicode range are required');
+          }
+          
+          console.log(`Testing map glyphs with fontStack: ${fontStack}, unicodeRange: ${unicodeRange}, endpoint: ${MCP_SERVER_URL}/getMapGlyphs`);
+          
+          const response = await fetch(`${MCP_SERVER_URL}/getMapGlyphs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mapName: mapName,
+              fontStack: fontStack,
+              unicodeRange: unicodeRange
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          if (!data || !data.glyphs) {
+            throw new Error('Invalid glyph data received from server');
+          }
+          
+          displayMapGlyphs(data);
+        } catch (error) {
+          console.error('Error getting map glyphs:', error);
+          document.getElementById('map-glyphs-result').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+      }
+      
+      // Display map glyphs
+      function displayMapGlyphs(glyphData) {
+        const container = document.getElementById('map-glyphs-result');
+        container.innerHTML = '';
+        
+        if (glyphData && glyphData.glyphs) {
+          // Create a div with info about the glyph data
+          const info = document.createElement('div');
+          info.innerHTML = `<p>Glyph data received successfully (${glyphData.glyphs.length} bytes)</p>`;
+          container.appendChild(info);
+          
+          // Create a pre element to show some of the raw data
+          const pre = document.createElement('pre');
+          pre.style.maxHeight = '100px';
+          pre.style.overflow = 'auto';
+          pre.style.background = '#f5f5f5';
+          pre.style.padding = '10px';
+          pre.style.borderRadius = '4px';
+          pre.style.fontSize = '12px';
+          
+          // Show just the first part of the base64 data
+          const previewLength = Math.min(100, glyphData.glyphs.length);
+          pre.textContent = `${glyphData.glyphs.substring(0, previewLength)}...`;
+          
+          container.appendChild(pre);
+          
+          // Add content type info
+          if (glyphData.contentType) {
+            const contentTypeInfo = document.createElement('p');
+            contentTypeInfo.innerHTML = `<small>Content Type: ${glyphData.contentType}</small>`;
+            container.appendChild(contentTypeInfo);
+          }
+          
+          // Add note about binary data
+          const note = document.createElement('p');
+          note.innerHTML = '<small>Note: Glyph data is binary and cannot be directly displayed</small>';
+          container.appendChild(note);
+        } else {
+          container.innerHTML = '<p>No glyph data available</p>';
+        }
+      }
+      
+      // Clear route and selected places
+      function clearRoute() {
+        console.log('Clearing route and selected places');
+        selectedPlaces = [];
+        
+        // Clear route from map
+        if (routeSource) {
+          routeSource.setData({
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: []
+            }
+          });
+        }
+        
+        // Clear all markers
+        clearMarkers();
+        
+        // Hide route info panel
+        document.getElementById('route-info').style.display = 'none';
+        document.getElementById('route-details').innerHTML = '';
+      }
+      
+      // Clear all markers from the map
+      function clearMarkers() {
+        markers.forEach(marker => marker.remove());
+        markers = [];
+      }
+      
+      // Initialize map on page load
+      // Function to update tile coordinate limits based on zoom level
+      function updateTileCoordinateLimits() {
+        const z = parseInt(document.getElementById('tile-z').value) || 0;
+        const maxCoord = Math.pow(2, z) - 1;
+        
+        // Update X and Y inputs
+        const xInput = document.getElementById('tile-x');
+        const yInput = document.getElementById('tile-y');
+        
+        // Set max attribute
+        xInput.setAttribute('max', maxCoord);
+        yInput.setAttribute('max', maxCoord);
+        
+        // Adjust values if they exceed the new maximum
+        if (parseInt(xInput.value) > maxCoord) {
+          xInput.value = maxCoord;
+        }
+        
+        if (parseInt(yInput.value) > maxCoord) {
+          yInput.value = maxCoord;
+        }
+        
+        // Update placeholder text
+        xInput.placeholder = `0-${maxCoord}`;
+        yInput.placeholder = `0-${maxCoord}`;
+      }
+      
+      document.addEventListener('DOMContentLoaded', function() {
+        // Disable search button until map is initialized
+        document.getElementById('search-button').disabled = true;
+        
+        // Set up event handlers for map components
+        document.getElementById('test-style-descriptor').addEventListener('click', testStyleDescriptor);
+        document.getElementById('test-map-tile').addEventListener('click', testMapTile);
+        document.getElementById('test-map-sprites').addEventListener('click', testMapSprites);
+        document.getElementById('test-map-glyphs').addEventListener('click', testMapGlyphs);
+        document.getElementById('test-route-matrix').addEventListener('click', testRouteMatrix);
+        document.getElementById('clear-route').addEventListener('click', clearRoute);
+        
+        // Add event listener to zoom level input to update X and Y max values
+        document.getElementById('tile-z').addEventListener('change', updateTileCoordinateLimits);
+        
+        // Initialize tile coordinate limits
+        updateTileCoordinateLimits();
+      });
+    </script>
+  </body>
+</html>

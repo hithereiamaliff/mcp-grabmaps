@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrabMaps MCP Visualization Demo</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 1;
+            max-width: 300px;
+        }
+        .control-panel h3 {
+            margin-top: 0;
+        }
+        .control-panel label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .control-panel input, .control-panel select, .control-panel button {
+            margin-bottom: 10px;
+            width: 100%;
+            padding: 5px;
+        }
+        .route-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="control-panel">
+        <h3>GrabMaps MCP Demo</h3>
+        
+        <label for="search-input">Search Places:</label>
+        <input type="text" id="search-input" placeholder="Enter a place name">
+        <button id="search-button">Search</button>
+        
+        <div id="search-results"></div>
+        
+        <div class="route-info" id="route-info" style="display: none;">
+            <h4>Route Information</h4>
+            <div id="route-details"></div>
+        </div>
+    </div>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script>
+        // Configuration
+        const MCP_SERVER_URL = 'http://localhost:3000';
+        const INITIAL_CENTER = [101.6942371, 3.1516964]; // Kuala Lumpur
+        const INITIAL_ZOOM = 12;
+        
+        // Initialize map
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZXhhbXBsZXVzZXIiLCJhIjoiY2xhbmRvbWtleSJ9.ZXhhbXBsZWtleQ'; // Replace with your Mapbox token or use a custom style
+        
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12', // Default style, will be replaced with GrabMaps style
+            center: INITIAL_CENTER,
+            zoom: INITIAL_ZOOM
+        });
+        
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+        
+        // Variables to store markers
+        let markers = [];
+        let routeSource = null;
+        
+        // Initialize map
+        map.on('load', async () => {
+            try {
+                // Try to load GrabMaps style descriptor
+                const styleResponse = await fetch(`${MCP_SERVER_URL}/getMapStyleDescriptor`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                if (styleResponse.ok) {
+                    const styleData = await styleResponse.json();
+                    console.log('Loaded GrabMaps style descriptor:', styleData);
+                    
+                    // If the style descriptor is valid, you could apply it here
+                    // map.setStyle(styleData);
+                }
+            } catch (error) {
+                console.error('Error loading GrabMaps style:', error);
+            }
+            
+            // Add a source for route lines
+            map.addSource('route', {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: []
+                    }
+                }
+            });
+            
+            routeSource = map.getSource('route');
+            
+            // Add a layer for route lines
+            map.addLayer({
+                id: 'route',
+                type: 'line',
+                source: 'route',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#3887be',
+                    'line-width': 5,
+                    'line-opacity': 0.75
+                }
+            });
+        });
+        
+        // Search places
+        document.getElementById('search-button').addEventListener('click', async () => {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+            
+            try {
+                const response = await fetch(`${MCP_SERVER_URL}/searchPlaceIndexForText`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: query,
+                        maxResults: 5
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displaySearchResults(data.results);
+            } catch (error) {
+                console.error('Error searching places:', error);
+                document.getElementById('search-results').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        });
+        
+        // Display search results
+        function displaySearchResults(results) {
+            // Clear existing markers
+            clearMarkers();
+            
+            const resultsContainer = document.getElementById('search-results');
+            resultsContainer.innerHTML = '';
+            
+            if (!results || results.length === 0) {
+                resultsContainer.innerHTML = '<p>No results found</p>';
+                return;
+            }
+            
+            const ul = document.createElement('ul');
+            ul.style.listStyle = 'none';
+            ul.style.padding = '0';
+            
+            results.forEach((result, index) => {
+                // Create list item
+                const li = document.createElement('li');
+                li.style.padding = '5px 0';
+                li.style.borderBottom = '1px solid #eee';
+                li.style.cursor = 'pointer';
+                
+                // Add result name
+                li.innerHTML = `<strong>${result.name}</strong>`;
+                
+                // Add marker to map
+                const marker = new mapboxgl.Marker()
+                    .setLngLat([result.coordinates.longitude, result.coordinates.latitude])
+                    .addTo(map);
+                
+                // Store marker
+                markers.push(marker);
+                
+                // Add click event to list item
+                li.addEventListener('click', () => {
+                    // Fly to location
+                    map.flyTo({
+                        center: [result.coordinates.longitude, result.coordinates.latitude],
+                        zoom: 15
+                    });
+                    
+                    // If this is the first click, set as origin
+                    if (!window.origin) {
+                        window.origin = result;
+                        li.style.backgroundColor = '#e6f7ff';
+                        alert('Origin set. Click another location to calculate a route.');
+                    } 
+                    // If origin is set and this is a different location, calculate route
+                    else if (window.origin.placeId !== result.placeId) {
+                        calculateRoute(window.origin, result);
+                    }
+                });
+                
+                ul.appendChild(li);
+            });
+            
+            resultsContainer.appendChild(ul);
+            
+            // Fit map to show all markers
+            if (results.length > 0) {
+                const bounds = new mapboxgl.LngLatBounds();
+                results.forEach(result => {
+                    bounds.extend([result.coordinates.longitude, result.coordinates.latitude]);
+                });
+                map.fitBounds(bounds, { padding: 50 });
+            }
+        }
+        
+        // Clear markers
+        function clearMarkers() {
+            markers.forEach(marker => marker.remove());
+            markers = [];
+            
+            // Clear route
+            if (routeSource) {
+                routeSource.setData({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: []
+                    }
+                });
+            }
+            
+            // Reset origin
+            window.origin = null;
+            
+            // Hide route info
+            document.getElementById('route-info').style.display = 'none';
+        }
+        
+        // Calculate route
+        async function calculateRoute(origin, destination) {
+            try {
+                const response = await fetch(`${MCP_SERVER_URL}/calculateRoute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        origin: {
+                            longitude: origin.coordinates.longitude,
+                            latitude: origin.coordinates.latitude
+                        },
+                        destination: {
+                            longitude: destination.coordinates.longitude,
+                            latitude: destination.coordinates.latitude
+                        },
+                        travelMode: 'Car',
+                        distanceUnit: 'Kilometers'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayRoute(data);
+            } catch (error) {
+                console.error('Error calculating route:', error);
+                alert(`Error calculating route: ${error.message}`);
+            }
+        }
+        
+        // Display route
+        function displayRoute(routeData) {
+            if (!routeData.geometry || routeData.geometry.length === 0) {
+                alert('No route geometry available');
+                return;
+            }
+            
+            // Update route source with geometry
+            const coordinates = routeData.geometry.map(point => point);
+            
+            if (routeSource) {
+                routeSource.setData({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: coordinates
+                    }
+                });
+            }
+            
+            // Display route info
+            const routeInfo = document.getElementById('route-info');
+            routeInfo.style.display = 'block';
+            
+            const routeDetails = document.getElementById('route-details');
+            routeDetails.innerHTML = `
+                <p><strong>Distance:</strong> ${(routeData.distance).toFixed(2)} km</p>
+                <p><strong>Duration:</strong> ${(routeData.duration / 60).toFixed(2)} minutes</p>
+            `;
+            
+            // Fit map to show route
+            const bounds = new mapboxgl.LngLatBounds();
+            coordinates.forEach(coord => {
+                bounds.extend(coord);
+            });
+            map.fitBounds(bounds, { padding: 50 });
+        }
+    </script>
+</body>
+</html>

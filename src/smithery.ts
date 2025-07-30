@@ -11,9 +11,12 @@ import { routeActions } from './actions/routes.js';
 // Load environment variables
 dotenv.config();
 
-// Define the config schema (optional, for passing secrets securely)
+// Define the config schema for passing secrets securely
 export const configSchema = z.object({
-  grabMapsApiKey: z.string().optional().describe('GrabMaps API key'),
+  grabMapsApiKey: z.string().describe('GrabMaps API key'),
+  awsAccessKeyId: z.string().describe('AWS Access Key ID'),
+  awsSecretAccessKey: z.string().describe('AWS Secret Access Key'),
+  awsRegion: z.string().optional().describe('AWS Region (default: ap-southeast-5)'),
 });
 
 /**
@@ -30,10 +33,17 @@ export default function createStatelessServer({
     version: '1.0.0',
   });
 
-  // Set API key from config if provided
-  if (_config.grabMapsApiKey) {
-    process.env.GRABMAPS_API_KEY = _config.grabMapsApiKey;
-  }
+  // Set API key from config
+  process.env.GRABMAPS_API_KEY = _config.grabMapsApiKey;
+  
+  // Set AWS credentials for GrabMaps integration via AWS Location Service
+  process.env.AWS_ACCESS_KEY_ID = _config.awsAccessKeyId;
+  process.env.AWS_SECRET_ACCESS_KEY = _config.awsSecretAccessKey;
+  
+  // Set AWS region if provided, otherwise use default
+  process.env.AWS_REGION = _config.awsRegion || 'ap-southeast-5';
+  
+  console.log('GrabMaps MCP Server initialized with credentials');
 
   // Register Places API tools
   server.registerTool(

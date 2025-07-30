@@ -101,7 +101,7 @@ For the best experience testing Places and Routes APIs, we recommend using the S
 1. Start your MCP server locally: `npm run dev`
 2. Open the Smithery playground at: https://smithery.ai/playground
 3. Connect to your local MCP server: `http://localhost:3000`
-4. Test Places and Routes API calls using the provided examples in [SMITHERY_TESTING.md](./SMITHERY_TESTING.md)
+4. Test Places and Routes API calls using the provided examples in [SMITHERY_TESTING.md](./tests/SMITHERY_TESTING.md)
 
 ## Important Notes for AI Models
 
@@ -257,7 +257,7 @@ node tests/test-suite.js
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
 ## Contributing
 

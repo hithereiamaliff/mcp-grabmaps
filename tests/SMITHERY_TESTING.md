@@ -19,18 +19,29 @@ This guide explains how to test the GrabMaps MCP server in the Smithery playgrou
 
 ## Testing Places API
 
+**Note on Country Codes**: For all Places API calls, it's strongly recommended to include the appropriate 3-letter ISO country code in your requests. This ensures more accurate search results. The MCP server will attempt to detect the country from the query if not specified, but explicit specification is more reliable.
+
 ### Search Places by Text
 
 ```json
 {
   "method": "searchPlaceIndexForText",
   "params": {
-    "text": "KLCC, Kuala Lumpur",
+    "query": "KLCC, Kuala Lumpur",
+    "country": "MYS",
     "placeIndexName": "explore.place.Grab",
     "maxResults": 5
   }
 }
 ```
+
+**Important**: Always include the `country` parameter with the appropriate 3-letter ISO country code for more accurate search results. Examples:
+- Malaysia: `MYS`
+- Singapore: `SGP`
+- Thailand: `THA`
+- Indonesia: `IDN`
+- Philippines: `PHL`
+- Vietnam: `VNM`
 
 ### Search Places by Position (Reverse Geocoding)
 
@@ -57,7 +68,11 @@ This guide explains how to test the GrabMaps MCP server in the Smithery playgrou
 }
 ```
 
+**Note**: While `getPlace` doesn't require a country code (as it uses a specific place ID), the initial search to obtain the place ID should include a country code for best results.
+
 ## Testing Routes API
+
+**Note**: Unlike Places API, Routes API doesn't require country codes as it works with precise coordinates.
 
 ### Calculate Route
 

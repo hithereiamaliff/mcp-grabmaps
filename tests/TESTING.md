@@ -63,8 +63,8 @@ Tests the `calculateRoute` endpoint with origin and destination coordinates in K
 
 ## Known Issues
 
-- The `getMapTile` endpoint may return a 500 error if the tile coordinates are invalid or if there's an issue with the AWS Location Service.
-- The map style descriptor may return empty sources and layers if the map style is not properly configured in AWS Location Service.
+- If country code is not specified in place search requests, the system will attempt to detect the country from the query, but this may not always be accurate.
+- Map rendering functionality is not directly available through the MCP server. To view and use maps, use the AWS Location Service console or visit the GrabMaps data coverage explorer at https://grabmaps.grab.com/explore-data-coverage.
 
 ## Manual Testing
 
@@ -75,8 +75,10 @@ You can also test the endpoints manually using tools like curl, Postman, or any 
 ```bash
 curl -X POST http://localhost:3000/searchPlaceIndexForText \
   -H "Content-Type: application/json" \
-  -d '{"query": "KLCC, Kuala Lumpur", "maxResults": 5}'
+  -d '{"query": "KLCC, Kuala Lumpur", "country": "MYS", "maxResults": 5}'
 ```
+
+**Note**: Always include the `country` parameter with the appropriate 3-letter ISO country code (e.g., "MYS" for Malaysia, "SGP" for Singapore, "THA" for Thailand) for more accurate search results.
 
 ### Example: Testing calculateRoute with curl
 
@@ -94,5 +96,6 @@ If you encounter issues with the tests:
 2. Check that the AWS Location Service resources (Place Index, Map, Route Calculator) are properly configured
 3. Ensure that the server is running on the expected port (default: 3000)
 4. Check the server logs for any error messages
+5. Make sure you're using the correct 3-letter ISO country codes (e.g., "MYS" for Malaysia, "SGP" for Singapore, "THA" for Thailand)
 
 For more detailed information on the API endpoints and their parameters, refer to the README.md file.

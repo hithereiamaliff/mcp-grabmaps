@@ -1,0 +1,35 @@
+# Development files
+.git/
+.github/
+.gitignore
+.env
+.env.example
+.vscode/
+.idea/
+.smithery/
+
+# Test files
+tests/
+*.test.js
+*.spec.js
+jest.config.js
+
+# Source files (since we're publishing the compiled version)
+src/
+tsconfig.json
+
+# Build artifacts
+coverage/
+.nyc_output/
+*.log
+
+# Examples and documentation that shouldn't be in the package
+examples/
+docs/
+*.md
+!README.md
+!LICENSE
+
+# Other unnecessary files
+node_modules/
+.DS_Store

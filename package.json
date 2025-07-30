@@ -27,7 +27,7 @@
     "smithery",
     "aws-location"
   ],
-  "author": "",
+  "author": "hithereiamaliff",
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-location": "^3.855.0",

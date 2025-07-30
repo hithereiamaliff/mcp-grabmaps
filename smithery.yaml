@@ -1,3 +1,13 @@
-runtime: typescript
+startCommand:
+  type: stdio
+  configSchema: {}
+  commandFunction: |-
+    (config) => ({
+      "command": "node",
+      "args": [
+        "dist/smithery.js"
+      ],
+      "env": {}
+    })
 build:
   dockerfile: Dockerfile

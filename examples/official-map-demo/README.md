@@ -66,7 +66,7 @@ This demo uses:
 - **Region**: The AWS region (e.g., ap-southeast-5 for Malaysia, ap-southeast-1 for Singapore)
 - **Map Name**: The AWS Location Service map resource name (default: explore.map.Grab)
 - **Place Index Name**: The AWS Location Service place index resource name (default: explore.place.Grab)
-- **Route Calculator Name**: The AWS Location Service route calculator resource name (default: explore.route.Grab)
+- **Route Calculator Name**: The AWS Location Service route calculator resource name (default: explore.route-calculator.Grab)
 
 ## Notes
 

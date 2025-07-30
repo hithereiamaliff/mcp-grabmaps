@@ -2,6 +2,8 @@
 
 This document provides information on how to test the GrabMaps MCP server and verify that all endpoints are working correctly.
 
+> **Important**: GrabMaps only supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN). Testing with locations outside these countries will not yield accurate results.
+
 ## Test Suite
 
 A comprehensive test suite is included in the `test-suite.js` file. This test suite covers all the endpoints provided by the GrabMaps MCP server and verifies that they are working correctly.

@@ -41,7 +41,10 @@ export default function createStatelessServer({
     {
       description: `Search for places using text query.
 
-IMPORTANT INSTRUCTION FOR AI MODELS: AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.
+IMPORTANT INSTRUCTION FOR AI MODELS: 
+1. GrabMaps ONLY supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN). Searches outside these countries will not return accurate results.
+
+2. AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.
 For example:
 - If user asks about "City Square Mall", determine it's in Singapore and use country: "SGP"
 - If user asks about "Songklanagarind Hospital", determine it's in Thailand and use country: "THA"
@@ -61,7 +64,7 @@ This is CRITICAL for returning accurate search results.`,
   server.registerTool(
     'searchPlaceIndexForPosition',
     {
-      description: 'Search for places by coordinates (reverse geocoding)',
+      description: 'Search for places by coordinates (reverse geocoding). Note: GrabMaps ONLY supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN). Searches outside these countries will not return accurate results.',
       inputSchema: {
         longitude: z.number().describe('Longitude coordinate'),
         latitude: z.number().describe('Latitude coordinate'),
@@ -77,7 +80,10 @@ This is CRITICAL for returning accurate search results.`,
     {
       description: `Get place suggestions based on partial text input.
 
-IMPORTANT INSTRUCTION FOR AI MODELS: AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.
+IMPORTANT INSTRUCTION FOR AI MODELS: 
+1. GrabMaps ONLY supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN). Searches outside these countries will not return accurate results.
+
+2. AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.
 For example:
 - If user asks about "City Square Mall", determine it's in Singapore and use country: "SGP"
 - If user asks about "Songklanagarind Hospital", determine it's in Thailand and use country: "THA"
@@ -97,7 +103,7 @@ This is CRITICAL for returning accurate search results.`,
   server.registerTool(
     'getPlace',
     {
-      description: 'Get place details by place ID',
+      description: 'Get place details by place ID. Note: GrabMaps ONLY supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN).',
       inputSchema: {
         placeId: z.string().describe('ID of the place to retrieve'),
         language: z.string().optional().describe('Language code'),

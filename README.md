@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for GrabMaps API integration, providing access to GrabMaps services through AWS Location Service.
 
+> **Important**: GrabMaps only supports eight countries in Southeast Asia: Malaysia, Singapore, Thailand, Myanmar, Cambodia, Vietnam, Philippines, and Indonesia. Search requests outside these countries will not return accurate results.
+
 ## Features
 
 This MCP server provides access to GrabMaps functionality through two main categories:
@@ -37,7 +39,7 @@ npm install mcp-grabmaps
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/mcp-grabmaps.git
+git clone https://github.com/hithereiamaliff/mcp-grabmaps.git
 cd mcp-grabmaps
 npm install
 ```
@@ -62,7 +64,7 @@ PLACE_INDEX_NAME=explore.place.Grab
 MAP_NAME=explore.map.Grab
 
 # Route calculator name
-ROUTE_CALCULATOR_NAME=explore.route.Grab
+ROUTE_CALCULATOR_NAME=explore.route-calculator.Grab
 
 # Server port
 PORT=3000
@@ -104,6 +106,21 @@ For the best experience testing Places and Routes APIs, we recommend using the S
 4. Test Places and Routes API calls using the provided examples in [SMITHERY_TESTING.md](./tests/SMITHERY_TESTING.md)
 
 ## Important Notes for AI Models
+
+### Supported Countries
+
+GrabMaps **ONLY** supports the following eight countries in Southeast Asia:
+
+- Malaysia (MYS)
+- Singapore (SGP)
+- Thailand (THA)
+- Myanmar (MMR)
+- Cambodia (KHM)
+- Vietnam (VNM)
+- Philippines (PHL)
+- Indonesia (IDN)
+
+AI models should not attempt to use GrabMaps for locations outside these countries as results will be inaccurate or non-existent.
 
 ### Country Code Requirements
 

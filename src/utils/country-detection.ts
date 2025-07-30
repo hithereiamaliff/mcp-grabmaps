@@ -137,6 +137,7 @@ export const enhanceResponseWithCountrySuggestions = (
     message: detectedCountry && !specifiedCountry
       ? `This query is for a location in ${detectedCountry}. Future requests MUST include 'country: "${detectedCountry}"'`
       : "AI models MUST analyze user queries to determine the country and ALWAYS include the country code parameter",
+    supportedCountries: "GrabMaps ONLY supports: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN). Searches outside these countries will not return accurate results.",
     correctFormat: formatExample,
     examples: [
       { 

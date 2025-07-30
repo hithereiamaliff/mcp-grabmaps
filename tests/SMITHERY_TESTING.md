@@ -1,6 +1,8 @@
-# Testing GrabMaps MCP in Smithery Playground
+# Testing GrabMaps MCP Server - Smithery Testing Guide
 
-This guide explains how to test the GrabMaps MCP server in the Smithery playground, focusing on the Places and Routes APIs.
+This document provides examples for testing the GrabMaps MCP server using the Smithery playground.
+
+> **Important**: GrabMaps only supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN). Testing with locations outside these countries will not yield accurate results.
 
 ## Prerequisites
 
@@ -88,7 +90,7 @@ This guide explains how to test the GrabMaps MCP server in the Smithery playgrou
       "longitude": 101.7068,
       "latitude": 3.1587
     },
-    "routeCalculatorName": "explore.route.Grab",
+    "routeCalculatorName": "explore.route-calculator.Grab",
     "travelMode": "Car"
   }
 }
@@ -108,7 +110,7 @@ This guide explains how to test the GrabMaps MCP server in the Smithery playgrou
       [101.7068, 3.1587],
       [101.6983, 3.1349]
     ],
-    "routeCalculatorName": "explore.route.Grab",
+    "routeCalculatorName": "explore.route-calculator.Grab",
     "travelMode": "Car"
   }
 }

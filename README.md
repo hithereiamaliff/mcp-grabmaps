@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for GrabMaps API integration, providing access to GrabMaps services through AWS Location Service.
 
+Do note that this MCP server is **NOT** officially affiliated with Grab, GrabMaps, or AWS Location Service.
+
 > **Important**: GrabMaps only supports eight countries in Southeast Asia.
 > 
 > - 🇲🇾 Malaysia (MYS)

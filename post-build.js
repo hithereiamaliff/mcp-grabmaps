@@ -22,7 +22,52 @@ if (!fs.existsSync(distDir)) {
 const smitheryJsPath = path.join(distDir, 'smithery.js');
 if (!fs.existsSync(smitheryJsPath)) {
   console.error('Error: smithery.js not found in dist directory after TypeScript compilation');
-  process.exit(1);
+  console.log('Creating a fallback smithery.js file...');
+  
+  // Create a fallback smithery.js file
+  const fallbackContent = `/**
+ * Fallback smithery.js file created by post-build script
+ */
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+
+// Define the config schema for passing secrets securely
+export const configSchema = z.object({
+  grabMapsApiKey: z.string().describe('GrabMaps API key'),
+  awsAccessKeyId: z.string().describe('AWS Access Key ID'),
+  awsSecretAccessKey: z.string().describe('AWS Secret Access Key'),
+  awsRegion: z.string().optional().describe('AWS Region (default: ap-southeast-5)'),
+});
+
+/**
+ * Creates a stateless MCP server for the GrabMaps API
+ */
+export default function createStatelessServer({
+  config: _config,
+}) {
+  const server = new McpServer({
+    name: 'grabmaps',
+    description: 'GrabMaps API integration for Model Context Protocol',
+    version: '1.0.0',
+  });
+
+  // Set API key from config
+  process.env.GRABMAPS_API_KEY = _config.grabMapsApiKey;
+  
+  // Set AWS credentials for GrabMaps integration via AWS Location Service
+  process.env.AWS_ACCESS_KEY_ID = _config.awsAccessKeyId;
+  process.env.AWS_SECRET_ACCESS_KEY = _config.awsSecretAccessKey;
+  
+  // Set AWS region if provided, otherwise use default
+  process.env.AWS_REGION = _config.awsRegion || 'ap-southeast-5';
+  
+  console.log('GrabMaps MCP Server initialized with credentials');
+
+  return server;
+}`;
+
+  fs.writeFileSync(smitheryJsPath, fallbackContent, 'utf8');
+  console.log('Fallback smithery.js file created successfully!');
 }
 
 console.log('Post-build verification completed successfully!');

@@ -19,5 +19,19 @@ if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
 
+// Ensure src directory exists and has the required files
+const srcDir = path.join(process.cwd(), 'src');
+if (!fs.existsSync(srcDir)) {
+  console.error('Error: src directory not found');
+  process.exit(1);
+}
+
+// Check if smithery.ts exists
+const smitheryTsPath = path.join(srcDir, 'smithery.ts');
+if (!fs.existsSync(smitheryTsPath)) {
+  console.error('Error: smithery.ts not found in src directory');
+  process.exit(1);
+}
+
 console.log('Pre-build preparation completed successfully!');
 

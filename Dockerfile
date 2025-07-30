@@ -9,8 +9,11 @@ RUN npm install
 # Then copy the rest of the application
 COPY . .
 
-# Build the application
+# Build the TypeScript files
 RUN npm run build
+
+# Verify the dist directory and files exist
+RUN ls -la dist/
 
 # Expose the port the app runs on
 EXPOSE 3000

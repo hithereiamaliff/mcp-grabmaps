@@ -3,21 +3,20 @@
   "version": "1.0.0",
   "description": "Model Context Protocol (MCP) server for GrabMaps API integration",
   "type": "module",
-  "main": "dist/smithery.js",
-  "module": "./dist/smithery.js",
-  "types": "dist/index.d.ts",
+  "main": "./src/smithery.ts",
+  "module": "./src/smithery.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "prebuild": "node pre-build.js",
+    "start": "node index.js",
     "build": "tsc",
-    "postbuild": "node post-build.js",
-    "dev:express": "ts-node src/index.ts",
-    "start:express": "node dist/index.js",
-    "dev": "npx @smithery/cli dev",
-    "start": "npx @smithery/cli start",
-    "test": "node tests/test-suite.js",
-    "smithery:dev": "npx @smithery/cli dev",
-    "smithery:build": "npx @smithery/cli build",
-    "smithery:deploy": "npx @smithery/cli deploy"
+    "prepublishOnly": "npm run build",
+    "dev": "npx @smithery/cli@1.2.14 dev",
+    "deploy": "npm run build && npx @smithery/cli@1.2.14 deploy",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "grabmaps",

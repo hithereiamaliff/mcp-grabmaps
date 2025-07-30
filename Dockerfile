@@ -1,5 +1,4 @@
-# Build stage
-FROM node:22-slim AS build
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -12,35 +11,15 @@ RUN npm ci
 # Copy the rest of the application
 COPY . .
 
-# Ensure dist directory exists
-RUN mkdir -p dist
-
-# Run TypeScript compilation
-RUN npm run build
+# Run the Smithery CLI build directly
+RUN npx @smithery/cli@1.2.14 build -o .smithery/index.cjs
 
 # Debug: Check if the build produced the expected files
-RUN ls -la dist/
-
-# Final stage
-FROM node:22-slim
-
-WORKDIR /app
-
-# Copy package files
-COPY package.json package-lock.json ./
-
-# Install production dependencies only
-RUN npm ci --production
-
-# Copy built files from build stage
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/smithery.yaml ./
-
-# Verify the file exists
-RUN ls -la dist/
+RUN ls -la
+RUN ls -la .smithery/
 
 # Expose the port the app runs on
 EXPOSE 3000
 
 # Command to run the application
-CMD ["node", "dist/smithery.js"]
+CMD ["npx", "@smithery/cli@1.2.14", "start"]

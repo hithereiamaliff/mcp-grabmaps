@@ -5,7 +5,7 @@ import {
   GetPlaceCommand
 } from '@aws-sdk/client-location';
 import { createLocationClient, getPlaceIndexName, mapCountryCode, DEFAULT_BIAS_POSITION } from '../utils/aws-client.js';
-import { ExtendedPlace, TimeZone } from '../types/aws-location.js';
+import { ExtendedPlace } from '../types/aws-location.js';
 
 // Define types for our MCP actions
 type SearchPlaceParams = {
@@ -34,6 +34,26 @@ type GetPlaceParams = {
   language?: string;
 };
 
+const formatPlace = (place: ExtendedPlace) => {
+  if (!place) return null;
+  const point = place.Geometry?.Point;
+  return {
+    Label: place.Label || '',
+    Geometry: point ? { Point: [point[0], point[1]] } : {},
+    AddressNumber: place.AddressNumber,
+    Street: place.Street,
+    Municipality: place.Municipality,
+    SubRegion: place.SubRegion,
+    Region: place.Region,
+    Country: place.Country,
+    PostalCode: place.PostalCode,
+    Interpolated: place.Interpolated,
+    TimeZone: place.TimeZone,
+    UnitType: place.UnitType,
+    UnitNumber: place.UnitNumber,
+  };
+};
+
 // Places Actions implementation
 export const placeActions = {
   // Search for places by text query
@@ -44,7 +64,6 @@ export const placeActions = {
       
       const { query, country, maxResults = 10, language } = params;
       
-      // Prepare filter countries if provided
       const filterCountries = country ? [mapCountryCode(country)] : undefined;
       
       const command = new SearchPlaceIndexForTextCommand({
@@ -58,24 +77,17 @@ export const placeActions = {
       
       const response = await client.send(command);
       
-      const data = {
-        results: response.Results?.map((result: any) => {
-          if (!result.Place) return null;
-          const { Place: place, PlaceId, Distance, Relevance } = result;
-          const point = place.Geometry?.Point;
-          if (!point || point.length < 2) return null;
-          
-          return {
-            placeId: PlaceId || '',
-            name: place.Label || '',
-            address: place.Address || {},
-            coordinates: { latitude: point[1], longitude: point[0] },
-            categories: place.Categories || [],
-            distance: Distance,
-            relevance: Relevance
-          };
-        }).filter(Boolean) || []
-      };
+      const results = response.Results?.map((result: any) => {
+        if (!result.Place) return null;
+        return {
+          Place: formatPlace(result.Place as ExtendedPlace),
+          Distance: result.Distance,
+          Relevance: result.Relevance,
+          PlaceId: result.PlaceId,
+        };
+      }).filter(Boolean);
+
+      const data = { Summary: response.Summary, Results: results };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
     } catch (error) {
       console.error('Error searching place index for text:', error);
@@ -100,23 +112,16 @@ export const placeActions = {
       
       const response = await client.send(command);
       
-      const data = {
-        results: response.Results?.map((result: any) => {
-          if (!result.Place) return null;
-          const { Place: place, PlaceId, Distance } = result;
-          const point = place.Geometry?.Point;
-          if (!point || point.length < 2) return null;
-          
-          return {
-            placeId: PlaceId || '',
-            name: place.Label || '',
-            address: place.Address || {},
-            coordinates: { latitude: point[1], longitude: point[0] },
-            categories: place.Categories || [],
-            distance: Distance
-          };
-        }).filter(Boolean) || []
-      };
+      const results = response.Results?.map((result: any) => {
+        if (!result.Place) return null;
+        return {
+          Place: formatPlace(result.Place as ExtendedPlace),
+          Distance: result.Distance,
+          PlaceId: result.PlaceId,
+        };
+      }).filter(Boolean);
+
+      const data = { Summary: response.Summary, Results: results };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
     } catch (error) {
       console.error('Error searching place index for position:', error);
@@ -145,12 +150,12 @@ export const placeActions = {
       
       const response = await client.send(command);
       
-      const data = {
-        suggestions: response.Results?.map((result: any) => {
-          if (!result.PlaceId || !result.Text) return null;
-          return { placeId: result.PlaceId, text: result.Text };
-        }).filter(Boolean) || []
-      };
+      const results = response.Results?.map((result: any) => {
+        if (!result.PlaceId || !result.Text) return null;
+        return { Text: result.Text, PlaceId: result.PlaceId };
+      }).filter(Boolean);
+
+      const data = { Summary: response.Summary, Results: results };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
     } catch (error) {
       console.error('Error searching place index for suggestions:', error);
@@ -178,19 +183,7 @@ export const placeActions = {
         throw new Error('Place not found');
       }
 
-      const place = response.Place as ExtendedPlace;
-      const point = place.Geometry?.Point;
-
-      const data = {
-        placeId: placeId,
-        name: place.Label || '',
-        address: place.Address || {},
-        coordinates: point ? { latitude: point[1], longitude: point[0] } : {},
-        categories: place.Categories || [],
-        timeZone: place.TimeZone || null,
-        postalCode: place.Address?.PostalCode || null
-      };
-
+      const data = { Place: formatPlace(response.Place as ExtendedPlace) };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
     } catch (error) {
       console.error('Error getting place details:', error);

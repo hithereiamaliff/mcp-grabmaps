@@ -31,6 +31,13 @@ This MCP server provides access to GrabMaps functionality through two main categ
 - **CalculateRoute**: Calculate routes between points with waypoints
 - **CalculateRouteMatrix**: Calculate a matrix of routes between multiple origins and destinations
 
+### Analytics & Monitoring
+- **Firebase Analytics**: Cloud-based analytics storage with Firebase Realtime Database
+- **Local Backup**: Automatic local file backup as fallback
+- **Visual Dashboard**: Real-time analytics dashboard with Chart.js
+- **Request Tracking**: Track requests by method, endpoint, client IP, and user agent
+- **Tool Call Tracking**: Monitor MCP tool usage and performance
+
 ### Maps Functionality (Requires AWS Console)
 **Note**: Map rendering functionality is not directly available through the MCP server. To view and use maps:
 
@@ -85,7 +92,7 @@ PORT=3000
 
 ## Usage
 
-### Running Locally
+### Method 1: Running Locally
 
 ```bash
 # Development mode
@@ -96,7 +103,7 @@ npm run build
 npm start
 ```
 
-### Using with Smithery
+### Method 2: Using with Smithery
 
 ```bash
 # Run in development mode
@@ -117,6 +124,183 @@ For the best experience testing Places and Routes APIs, we recommend using the S
 2. Open the Smithery playground at: https://smithery.ai/playground
 3. Connect to your local MCP server: `http://localhost:3000`
 4. Test Places and Routes API calls using the provided examples in [SMITHERY_TESTING.md](./tests/SMITHERY_TESTING.md)
+
+### Method 3: Self-Hosted VPS Deployment
+
+Deploy the MCP server on your own VPS with Docker and Nginx. This method supports **per-user credentials via URL query parameters**, allowing multiple users to connect with their own GrabMaps and AWS credentials.
+
+#### VPS URL Format
+
+```
+https://mcp.techmavie.digital/grabmaps/mcp?grabMapsApiKey=YOUR_KEY&awsAccessKeyId=YOUR_AWS_KEY&awsSecretAccessKey=YOUR_AWS_SECRET
+```
+
+**Query Parameters:**
+
+| Parameter | Required | Description | Example |
+|-----------|----------|-------------|---------|
+| `grabMapsApiKey` | ✅ Yes | Your GrabMaps API key | `your-grabmaps-api-key` |
+| `awsAccessKeyId` | ✅ Yes | Your AWS Access Key ID | `AKIAIOSFODNN7EXAMPLE` |
+| `awsSecretAccessKey` | ✅ Yes | Your AWS Secret Access Key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `awsRegion` | ❌ No | AWS Region (default: ap-southeast-5) | `ap-southeast-1` |
+
+#### Client Configuration
+
+**Claude Desktop:**
+```json
+{
+  "mcpServers": {
+    "grabmaps": {
+      "transport": "streamable-http",
+      "url": "https://mcp.techmavie.digital/grabmaps/mcp?grabMapsApiKey=YOUR_KEY&awsAccessKeyId=YOUR_AWS_KEY&awsSecretAccessKey=YOUR_AWS_SECRET"
+    }
+  }
+}
+```
+
+**Cursor/Windsurf:** Same format in their MCP configuration files.
+
+#### Live Demo
+
+A public instance is available at:
+```
+https://mcp.techmavie.digital/grabmaps/mcp
+```
+
+Provide your credentials via query parameters as shown above.
+
+---
+
+## VPS Deployment
+
+### Architecture
+
+```
+Client (Claude, Cursor, Windsurf, etc.)
+    ↓ HTTPS
+https://mcp.techmavie.digital/grabmaps/mcp
+    ↓
+Nginx (SSL termination + reverse proxy)
+    ↓ HTTP
+Docker Container (port 8092 → 8080)
+    ↓
+GrabMaps MCP Server (Streamable HTTP Transport)
+    ↓
+GrabMaps API + AWS Location Service
+```
+
+### Deployment Files
+
+| File | Description |
+|------|-------------|
+| `src/http-server.ts` | HTTP server with Streamable HTTP transport |
+| `Dockerfile` | Container configuration for VPS |
+| `docker-compose.yml` | Docker orchestration (port 8092) |
+| `deploy/nginx-mcp.conf` | Nginx reverse proxy configuration |
+| `.github/workflows/deploy-vps.yml` | Auto-deployment via GitHub Actions |
+
+### Quick Deploy
+
+```bash
+# On your VPS
+mkdir -p /opt/mcp-servers/grabmaps
+cd /opt/mcp-servers/grabmaps
+git clone https://github.com/hithereiamaliff/mcp-grabmaps.git .
+docker compose up -d --build
+
+# Configure Nginx (add location block from deploy/nginx-mcp.conf)
+sudo nano /etc/nginx/sites-available/mcp.techmavie.digital
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/` | Server info and usage instructions |
+| `/health` | Health check with Firebase status |
+| `/mcp` | MCP endpoint (requires credentials) |
+| `/analytics` | Analytics data (JSON) |
+| `/analytics/dashboard` | Visual analytics dashboard |
+
+---
+
+## Firebase Analytics
+
+The VPS deployment includes Firebase Realtime Database integration for cloud-based analytics storage.
+
+### Features
+
+- **Dual Storage**: Firebase (primary) + local file backup (fallback)
+- **Real-time Tracking**: Requests, tool calls, client IPs, user agents
+- **Visual Dashboard**: Chart.js dashboard at `/analytics/dashboard`
+- **Persistent**: Analytics survive container restarts and redeployments
+- **Auto-save**: Saves every 60 seconds + on graceful shutdown
+
+### Analytics Data Tracked
+
+- Total requests and tool calls
+- Requests by method (GET, POST)
+- Requests by endpoint (/, /health, /mcp, /analytics)
+- Tool usage statistics
+- Client tracking (IP addresses, user agents)
+- Hourly request patterns
+- Recent tool call history
+
+### Firebase Setup
+
+See [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) for complete setup instructions.
+
+**Quick setup:**
+```bash
+# On VPS
+cd /opt/mcp-servers/grabmaps
+mkdir -p .credentials
+nano .credentials/firebase-service-account.json  # Paste your Firebase service account JSON
+
+# Copy to Docker volume
+docker volume create grabmaps_firebase-credentials
+docker run --rm \
+  -v grabmaps_firebase-credentials:/credentials \
+  -v $(pwd)/.credentials:/source:ro \
+  alpine cp /source/firebase-service-account.json /credentials/
+
+# Fix permissions
+docker run --rm \
+  -v grabmaps_firebase-credentials:/credentials \
+  alpine chown -R 1001:1001 /credentials/
+
+# Restart
+docker compose down
+docker compose up -d --build
+```
+
+### Viewing Analytics
+
+- **Dashboard**: `https://mcp.techmavie.digital/grabmaps/analytics/dashboard`
+- **JSON API**: `https://mcp.techmavie.digital/grabmaps/analytics`
+- **Firebase Console**: https://console.firebase.google.com/ → Your Project → Realtime Database
+
+### Firebase Data Structure
+
+```
+mcp-analytics/
+  └── mcp-grabmaps/
+      ├── serverStartTime: "2026-01-06T..."
+      ├── totalRequests: 123
+      ├── totalToolCalls: 45
+      ├── requestsByMethod: {...}
+      ├── requestsByEndpoint: {...}
+      ├── toolCalls: {...}
+      ├── recentToolCalls: [...]
+      ├── clientsByIp: {...}
+      ├── clientsByUserAgent: {...}
+      ├── hourlyRequests: {...}
+      └── lastUpdated: 1704470400000
+```
+
+---
 
 ## Important Notes for AI Models
 

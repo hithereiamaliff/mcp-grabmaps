@@ -24,3 +24,7 @@ out/
 *.swp
 *.swo
 .DS_Store
+
+# Firebase credentials (never commit!)
+.credentials/
+firebase-service-account.json

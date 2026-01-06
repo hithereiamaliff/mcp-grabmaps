@@ -11,7 +11,11 @@ services:
     environment:
       - PORT=8080
       - HOST=0.0.0.0
+      - ANALYTICS_DIR=/app/data
       - NODE_ENV=production
+    volumes:
+      - analytics-data:/app/data
+      - firebase-credentials:/app/.credentials:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
@@ -29,3 +33,9 @@ services:
 networks:
   mcp-network:
     driver: bridge
+
+volumes:
+  analytics-data:
+    driver: local
+  firebase-credentials:
+    driver: local

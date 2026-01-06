@@ -25,7 +25,16 @@ RUN npm prune --production
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S mcp -u 1001
+
+# Create data directory for analytics
+RUN mkdir -p /app/data
+
+# Create credentials directory (will be mounted as volume)
+RUN mkdir -p /app/.credentials
+
+# Set ownership
 RUN chown -R mcp:nodejs /app
+
 USER mcp
 
 # Expose port for HTTP server

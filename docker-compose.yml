@@ -1,0 +1,31 @@
+# GrabMaps MCP Server - Docker Compose
+# For self-hosting on VPS
+
+services:
+  mcp-grabmaps:
+    build: .
+    container_name: mcp-grabmaps
+    restart: unless-stopped
+    ports:
+      - "8092:8080"
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mcp-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  mcp-network:
+    driver: bridge

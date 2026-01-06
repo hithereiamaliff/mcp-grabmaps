@@ -13,6 +13,9 @@
   "scripts": {
     "start": "node index.js",
     "build": "tsc",
+    "build:tsc": "tsc",
+    "dev:http": "npx tsx src/http-server.ts",
+    "start:http": "node dist/http-server.js",
     "prepublishOnly": "npm run build",
     "dev": "npx @smithery/cli@1.2.14 dev",
     "deploy": "npm run build && npx @smithery/cli@1.2.14 deploy",

@@ -724,11 +724,6 @@ app.all('/mcp', async (req: Request, res: Response) => {
     // Log credential usage (masked)
     console.log(`[grabmaps-mcp] Using credentials: grabMapsApiKey=${grabMapsApiKey.substring(0, 8)}..., awsAccessKeyId=${awsAccessKeyId.substring(0, 8)}...`);
 
-    // Track tool calls from request body
-    if (req.body?.method === 'tools/call' && req.body?.params?.name) {
-      trackToolCall(req.body.params.name, req);
-    }
-
     // Create MCP server with user credentials
     const mcpServer = createMcpServer({
       grabMapsApiKey,

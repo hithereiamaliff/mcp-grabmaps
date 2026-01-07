@@ -4,24 +4,10 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-// Validate required environment variables
-const validateEnv = () => {
-  const requiredVars = [
-    'AWS_ACCESS_KEY_ID',
-    'AWS_SECRET_ACCESS_KEY',
-    'GRABMAPS_API_KEY',
-  ];
-  
-  const missingVars = requiredVars.filter(varName => !process.env[varName]);
-  
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
-  }
-};
-
 // Create AWS Location client
 export const createLocationClient = (): LocationClient => {
-  validateEnv();
+  // Note: For VPS deployment, credentials are set via query parameters in http-server.ts
+  // Don't validate here as they may not be in env vars yet
   
   return new LocationClient({
     region: process.env.AWS_REGION || 'ap-southeast-5',

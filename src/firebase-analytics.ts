@@ -72,7 +72,8 @@ class FirebaseAnalytics {
         return key.replace(/[.#$\/\[\]]/g, '_');
       };
 
-      const sanitizeObject = (obj: Record<string, any>): Record<string, any> => {
+      const sanitizeObject = (obj: Record<string, any> | undefined | null): Record<string, any> => {
+        if (!obj) return {};
         const sanitized: Record<string, any> = {};
         for (const [key, value] of Object.entries(obj)) {
           sanitized[sanitizeKey(key)] = value;

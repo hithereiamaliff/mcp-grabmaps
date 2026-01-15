@@ -310,6 +310,76 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
 // ============================================================================
 
 /**
+ * Smithery server-card.json endpoint for external MCP discovery
+ */
+app.get('/.well-known/mcp/server-card.json', (req: Request, res: Response) => {
+  trackRequest(req, '/.well-known/mcp/server-card.json');
+  res.json({
+    name: 'grabmaps-mcp',
+    version: SERVER_VERSION,
+    description: 'MCP server for GrabMaps API - Places & Routes for Southeast Asia (Malaysia, Singapore, Thailand, Myanmar, Cambodia, Vietnam, Philippines, Indonesia)',
+    homepage: 'https://github.com/hithereiamaliff/mcp-grabmaps',
+    transport: {
+      type: 'streamable-http',
+      url: '/mcp'
+    },
+    capabilities: {
+      tools: true,
+      resources: true,
+      prompts: true
+    },
+    authentication: {
+      type: 'query-params',
+      params: [
+        { name: 'grabMapsApiKey', required: true, description: 'Your GrabMaps API key' },
+        { name: 'awsAccessKeyId', required: true, description: 'Your AWS Access Key ID' },
+        { name: 'awsSecretAccessKey', required: true, description: 'Your AWS Secret Access Key' },
+        { name: 'awsRegion', required: false, description: 'AWS Region (default: ap-southeast-5)' }
+      ]
+    }
+  });
+});
+
+/**
+ * Smithery mcp-config endpoint for session configuration
+ */
+app.get('/.well-known/mcp-config', (req: Request, res: Response) => {
+  trackRequest(req, '/.well-known/mcp-config');
+  res.json({
+    schema: {
+      type: 'object',
+      properties: {
+        grabMapsApiKey: {
+          type: 'string',
+          description: 'Your GrabMaps API key',
+          title: 'GrabMaps API Key',
+          format: 'password'
+        },
+        awsAccessKeyId: {
+          type: 'string',
+          description: 'Your AWS Access Key ID',
+          title: 'AWS Access Key ID',
+          format: 'password'
+        },
+        awsSecretAccessKey: {
+          type: 'string',
+          description: 'Your AWS Secret Access Key',
+          title: 'AWS Secret Access Key',
+          format: 'password'
+        },
+        awsRegion: {
+          type: 'string',
+          description: 'AWS Region',
+          title: 'AWS Region',
+          default: 'ap-southeast-5'
+        }
+      },
+      required: ['grabMapsApiKey', 'awsAccessKeyId', 'awsSecretAccessKey']
+    }
+  });
+});
+
+/**
  * Root endpoint - Server info and usage instructions
  */
 app.get('/', (req: Request, res: Response) => {
@@ -709,7 +779,68 @@ app.all('/mcp', async (req: Request, res: Response) => {
     const awsSecretAccessKey = req.query.awsSecretAccessKey as string;
     const awsRegion = req.query.awsRegion as string | undefined;
 
-    // Validate required credentials
+    // Handle Smithery discovery/scanning requests (no credentials)
+    // Smithery sends POST with MCP initialize/tools/list methods to discover server capabilities
+    // We create a temporary demo server to handle these requests without real credentials
+    const hasCredentials = grabMapsApiKey && awsAccessKeyId && awsSecretAccessKey;
+    const mcpMethod = req.body?.method;
+    const isDiscoveryRequest = !hasCredentials && mcpMethod && (
+      mcpMethod === 'initialize' ||
+      mcpMethod === 'tools/list' ||
+      mcpMethod === 'resources/list' ||
+      mcpMethod === 'prompts/list' ||
+      mcpMethod === 'notifications/initialized'
+    );
+    
+    if (isDiscoveryRequest) {
+      // Create a demo MCP server for discovery (no real GrabMaps connection)
+      console.log(`[DEBUG] Handling discovery request: ${mcpMethod}`);
+      
+      const demoServer = new McpServer({
+        name: 'grabmaps-mcp',
+        version: SERVER_VERSION,
+        capabilities: {
+          resources: {},
+          tools: {},
+          prompts: {},
+          logging: {}
+        }
+      });
+      
+      // Register all tools for discovery (demo versions)
+      demoServer.tool('searchPlaceIndexForText', 'Search for places using text query. GrabMaps supports 8 Southeast Asian countries: Malaysia, Singapore, Thailand, Myanmar, Cambodia, Vietnam, Philippines, Indonesia.', {}, async () => ({
+        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+      }));
+      demoServer.tool('searchPlaceIndexForPosition', 'Search for places by coordinates (reverse geocoding). Supports Southeast Asia only.', {}, async () => ({
+        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+      }));
+      demoServer.tool('searchPlaceIndexForSuggestions', 'Get place suggestions based on partial text input. Supports Southeast Asia only.', {}, async () => ({
+        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+      }));
+      demoServer.tool('getPlace', 'Get place details by place ID. Supports Southeast Asia only.', {}, async () => ({
+        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+      }));
+      demoServer.tool('calculateRoute', 'Calculate a route between two points. Supports Car, Truck, Walking, Bicycle, Motorcycle modes.', {}, async () => ({
+        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+      }));
+      demoServer.tool('calculateRouteMatrix', 'Calculate route matrix between multiple origins and destinations.', {}, async () => ({
+        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+      }));
+      
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+      });
+      
+      res.on('close', () => {
+        transport.close();
+      });
+      
+      await demoServer.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+      return;
+    }
+
+    // Validate required credentials for actual MCP requests
     if (!grabMapsApiKey || !awsAccessKeyId || !awsSecretAccessKey) {
       res.status(400).json({
         error: 'Missing required parameters',

@@ -1,5 +1,7 @@
 # GrabMaps MCP Server
 
+[![smithery badge](https://smithery.ai/badge/@hithereiamaliff/mcp-grabmaps)](https://smithery.ai/server/@hithereiamaliff/mcp-grabmaps)
+
 A Model Context Protocol (MCP) server for GrabMaps API integration, providing access to GrabMaps services through AWS Location Service.
 
 Do note that this MCP server is **NOT** officially affiliated with Grab, GrabMaps, or AWS Location Service.

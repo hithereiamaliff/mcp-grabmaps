@@ -66,16 +66,16 @@ npm install
 
 ## Configuration
 
-Create a `.env` file in the root directory with the following variables:
+### VPS / HTTP Server (Key Service mode)
+
+The HTTP server authenticates users via the [MCP Key Service](https://github.com/hithereiamaliff/mcp-key-service). Users register their GrabMaps + AWS credentials with the key service and receive a single `usr_XXXXXXXX` API key.
+
+Create a `.env` file:
 
 ```
-# GrabMaps API credentials
-GRABMAPS_API_KEY=your_grabmaps_api_key_here
-
-# AWS credentials for AWS Location Service
-AWS_ACCESS_KEY_ID=your_aws_access_key_id_here
-AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
-AWS_REGION=ap-southeast-5  # Default region for Malaysia (ap-southeast-1 for Singapore)
+# MCP Key Service (required for hosted HTTP server)
+KEY_SERVICE_URL=http://mcp-key-service:8090/internal/resolve
+KEY_SERVICE_TOKEN=your_server_token_here
 
 # Place Index name (default for GrabMaps)
 PLACE_INDEX_NAME=explore.place.Grab
@@ -88,6 +88,26 @@ ROUTE_CALCULATOR_NAME=explore.route-calculator.Grab
 
 # Server port
 PORT=3000
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `KEY_SERVICE_URL` | Yes (HTTP) | MCP Key Service resolve endpoint |
+| `KEY_SERVICE_TOKEN` | Yes (HTTP) | Bearer token for authenticating with the key service |
+| `PLACE_INDEX_NAME` | No | AWS Place Index name (default: `explore.place.Grab`) |
+| `MAP_NAME` | No | AWS Map name (default: `explore.map.Grab`) |
+| `ROUTE_CALCULATOR_NAME` | No | AWS Route Calculator name (default: `explore.route-calculator.Grab`) |
+| `PORT` | No | Server port (default: `3000`) |
+
+### Smithery / Local Dev
+
+When running via Smithery or local development, GrabMaps and AWS credentials are provided directly through the Smithery SDK config schema (not via key service). Set them in `.env`:
+
+```
+GRABMAPS_API_KEY=your_grabmaps_api_key_here
+AWS_ACCESS_KEY_ID=your_aws_access_key_id_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
+AWS_REGION=ap-southeast-5
 ```
 
 ## Usage
@@ -127,22 +147,17 @@ For the best experience testing Places and Routes APIs, we recommend using the S
 
 ### Method 3: Self-Hosted VPS Deployment
 
-Deploy the MCP server on your own VPS with Docker and Nginx. This method supports **per-user credentials via URL query parameters**, allowing multiple users to connect with their own GrabMaps and AWS credentials.
+Deploy the MCP server on your own VPS with Docker and Nginx. Authentication is handled by the **MCP Key Service** — users provide a single `usr_XXXXXXXX` API key instead of raw credentials.
 
 #### VPS URL Format
 
 ```
-https://mcp.techmavie.digital/grabmaps/mcp?grabMapsApiKey=YOUR_KEY&awsAccessKeyId=YOUR_AWS_KEY&awsSecretAccessKey=YOUR_AWS_SECRET
+# Query parameter
+https://mcp.techmavie.digital/grabmaps/mcp?api_key=usr_XXXXXXXX
+
+# Path-based
+https://mcp.techmavie.digital/grabmaps/mcp/usr_XXXXXXXX
 ```
-
-**Query Parameters:**
-
-| Parameter | Required | Description | Example |
-|-----------|----------|-------------|---------|
-| `grabMapsApiKey` | ✅ Yes | Your GrabMaps API key | `your-grabmaps-api-key` |
-| `awsAccessKeyId` | ✅ Yes | Your AWS Access Key ID | `AKIAIOSFODNN7EXAMPLE` |
-| `awsSecretAccessKey` | ✅ Yes | Your AWS Secret Access Key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
-| `awsRegion` | ❌ No | AWS Region (default: ap-southeast-5) | `ap-southeast-1` |
 
 #### Client Configuration
 
@@ -152,7 +167,7 @@ https://mcp.techmavie.digital/grabmaps/mcp?grabMapsApiKey=YOUR_KEY&awsAccessKeyI
   "mcpServers": {
     "grabmaps": {
       "transport": "streamable-http",
-      "url": "https://mcp.techmavie.digital/grabmaps/mcp?grabMapsApiKey=YOUR_KEY&awsAccessKeyId=YOUR_AWS_KEY&awsSecretAccessKey=YOUR_AWS_SECRET"
+      "url": "https://mcp.techmavie.digital/grabmaps/mcp?api_key=usr_XXXXXXXX"
     }
   }
 }
@@ -167,7 +182,7 @@ A public instance is available at:
 https://mcp.techmavie.digital/grabmaps/mcp
 ```
 
-Provide your credentials via query parameters as shown above.
+Register your GrabMaps + AWS credentials with the MCP Key Service to get your `usr_XXXXXXXX` API key.
 
 ---
 
@@ -177,16 +192,18 @@ Provide your credentials via query parameters as shown above.
 
 ```
 Client (Claude, Cursor, Windsurf, etc.)
-    ↓ HTTPS
-https://mcp.techmavie.digital/grabmaps/mcp
+    ↓ HTTPS (usr_XXXXXXXX key)
+https://mcp.techmavie.digital/grabmaps/mcp/usr_XXXXXXXX
     ↓
 Nginx (SSL termination + reverse proxy)
     ↓ HTTP
 Docker Container (port 8092 → 8080)
     ↓
 GrabMaps MCP Server (Streamable HTTP Transport)
+    ↓ resolves usr_ key
+MCP Key Service → decrypted GrabMaps + AWS credentials
     ↓
-GrabMaps API + AWS Location Service
+AWS Location Service (GrabMaps)
 ```
 
 ### Deployment Files
@@ -202,10 +219,17 @@ GrabMaps API + AWS Location Service
 ### Quick Deploy
 
 ```bash
-# On your VPS
+# On your VPS — ensure the shared Docker network exists
+docker network create mcp-network  # only needed once
+
 mkdir -p /opt/mcp-servers/grabmaps
 cd /opt/mcp-servers/grabmaps
 git clone https://github.com/hithereiamaliff/mcp-grabmaps.git .
+
+# Set key-service env vars
+cp .env.example .env
+nano .env  # set KEY_SERVICE_URL and KEY_SERVICE_TOKEN
+
 docker compose up -d --build
 
 # Configure Nginx (add location block from deploy/nginx-mcp.conf)
@@ -220,9 +244,12 @@ sudo systemctl reload nginx
 |----------|-------------|
 | `/` | Server info and usage instructions |
 | `/health` | Health check with Firebase status |
-| `/mcp` | MCP endpoint (requires credentials) |
+| `/mcp?api_key=usr_...` | MCP endpoint (query param auth) |
+| `/mcp/usr_...` | MCP endpoint (path-based auth) |
 | `/analytics` | Analytics data (JSON) |
 | `/analytics/dashboard` | Visual analytics dashboard |
+| `/.well-known/mcp/server-card.json` | MCP server discovery |
+| `/.well-known/mcp-config` | MCP session configuration schema |
 
 ---
 

@@ -1,4 +1,5 @@
 import {
+  LocationClient,
   CalculateRouteCommand,
   CalculateRouteMatrixCommand,
   TravelMode,
@@ -47,9 +48,9 @@ const convertDistanceUnit = (unit: string): DistanceUnit => {
 // Routes Actions implementation
 export const routeActions = {
   // Calculate route between origin and destination
-  calculateRoute: async (params: CalculateRouteParams) => {
+  calculateRoute: async (params: CalculateRouteParams, injectedClient?: LocationClient) => {
     try {
-      const client = createLocationClient();
+      const client = injectedClient || createLocationClient();
       const routeCalculator = getRouteCalculatorName();
 
       const {
@@ -105,9 +106,9 @@ export const routeActions = {
   },
 
   // Calculate route matrix between multiple origins and destinations
-  calculateRouteMatrix: async (params: CalculateRouteMatrixParams) => {
+  calculateRouteMatrix: async (params: CalculateRouteMatrixParams, injectedClient?: LocationClient) => {
     try {
-      const client = createLocationClient();
+      const client = injectedClient || createLocationClient();
       const routeCalculator = getRouteCalculatorName();
 
       const {

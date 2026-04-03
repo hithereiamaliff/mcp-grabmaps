@@ -1,9 +1,9 @@
 /**
  * GrabMaps MCP Server - HTTP Server Entry Point
  * Streamable HTTP transport for VPS deployment
- * 
- * Supports per-user credentials via URL query parameters:
- * ?grabMapsApiKey=...&awsAccessKeyId=...&awsSecretAccessKey=...&awsRegion=...
+ *
+ * Authentication via MCP Key Service: users provide a usr_XXXXXXXX key
+ * which is resolved to GrabMaps + AWS credentials at runtime.
  */
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
@@ -16,6 +16,8 @@ import { z } from 'zod';
 import { placeActions } from './actions/places.js';
 import { routeActions } from './actions/routes.js';
 import { FirebaseAnalytics, Analytics } from './firebase-analytics.js';
+import { createLocationClient } from './utils/aws-client.js';
+import { isKeyServiceEnabled, resolveKeyCredentials, type ResolvedCredentials } from './utils/key-service.js';
 
 // Load environment variables
 dotenv.config();
@@ -30,6 +32,29 @@ const MAX_RECENT_CALLS = 100;
 // Server metadata
 const SERVER_NAME = 'GrabMaps MCP Server';
 const SERVER_VERSION = '1.0.0';
+
+// Key-service config (read here for logging only; the utility reads them itself)
+const KEY_SERVICE_URL = process.env.KEY_SERVICE_URL || '';
+const KEY_SERVICE_TOKEN = process.env.KEY_SERVICE_TOKEN || '';
+
+if (isKeyServiceEnabled()) {
+  console.log(`Key Service mode enabled. User keys will be resolved via: ${KEY_SERVICE_URL}`);
+} else if (KEY_SERVICE_URL || KEY_SERVICE_TOKEN) {
+  console.warn('Hosted key-service mode requires both KEY_SERVICE_URL and KEY_SERVICE_TOKEN.');
+} else {
+  console.warn('KEY_SERVICE_URL and KEY_SERVICE_TOKEN are not set. MCP endpoints will return 503 until configured.');
+}
+
+// HttpError for typed error responses
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 // Track server start time for uptime
 const serverStartTime = Date.now();
@@ -182,20 +207,40 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/** Extract usr_ key from ?api_key= or ?apiKey= query param */
+function getHostedUserKeyFromQuery(req: Request): string | undefined {
+  const candidate = req.query.api_key ?? req.query.apiKey;
+  return typeof candidate === 'string' && candidate.startsWith('usr_')
+    ? candidate
+    : undefined;
+}
+
+/** Normalize route for analytics (mask user keys) */
+function normalizeRouteForAnalytics(req: Request): string {
+  if (req.path.startsWith('/mcp/usr_')) return '/mcp/:userKey';
+  return req.path;
+}
+
+// =============================================================================
+// MCP Server factory
+// =============================================================================
+
 /**
- * Creates an MCP server instance with the provided credentials
+ * Creates an MCP server instance with the provided credentials.
+ * Credentials are passed directly to the AWS LocationClient via closure —
+ * no global process.env mutation.
  */
-function createMcpServer(config: {
-  grabMapsApiKey: string;
-  awsAccessKeyId: string;
-  awsSecretAccessKey: string;
-  awsRegion?: string;
-}): McpServer {
-  // Set environment variables for the API calls
-  process.env.GRABMAPS_API_KEY = config.grabMapsApiKey;
-  process.env.AWS_ACCESS_KEY_ID = config.awsAccessKeyId;
-  process.env.AWS_SECRET_ACCESS_KEY = config.awsSecretAccessKey;
-  process.env.AWS_REGION = config.awsRegion || 'ap-southeast-5';
+function createMcpServer(config: ResolvedCredentials): McpServer {
+  // Create a request-scoped LocationClient with explicit credentials
+  const locationClient = createLocationClient({
+    accessKeyId: config.awsAccessKeyId,
+    secretAccessKey: config.awsSecretAccessKey,
+    region: config.awsRegion,
+  });
 
   const server = new McpServer({
     name: 'grabmaps',
@@ -203,13 +248,13 @@ function createMcpServer(config: {
     version: SERVER_VERSION,
   });
 
-  // Register Places API tools
+  // Register Places API tools — pass locationClient via closure
   server.registerTool(
     'searchPlaceIndexForText',
     {
       description: `Search for places using text query.
 
-IMPORTANT INSTRUCTION FOR AI MODELS: 
+IMPORTANT INSTRUCTION FOR AI MODELS:
 1. GrabMaps ONLY supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN). Searches outside these countries will not return accurate results.
 
 2. AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.`,
@@ -222,7 +267,7 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
         language: z.string().optional().describe('Language code'),
       }
     },
-    placeActions.searchPlaceIndexForText
+    (params) => placeActions.searchPlaceIndexForText(params, locationClient)
   );
 
   server.registerTool(
@@ -236,7 +281,7 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
         language: z.string().optional().describe('Language code'),
       },
     },
-    placeActions.searchPlaceIndexForPosition
+    (params) => placeActions.searchPlaceIndexForPosition(params, locationClient)
   );
 
   server.registerTool(
@@ -244,7 +289,7 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
     {
       description: `Get place suggestions based on partial text input.
 
-IMPORTANT INSTRUCTION FOR AI MODELS: 
+IMPORTANT INSTRUCTION FOR AI MODELS:
 1. GrabMaps ONLY supports eight countries in Southeast Asia: Malaysia (MYS), Singapore (SGP), Thailand (THA), Myanmar (MMR), Cambodia (KHM), Vietnam (VNM), Philippines (PHL), and Indonesia (IDN).
 
 2. AI models MUST analyze the user's query to determine the country and ALWAYS include the appropriate country code in the request.`,
@@ -257,7 +302,7 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
         language: z.string().optional().describe('Language code'),
       }
     },
-    placeActions.searchPlaceIndexForSuggestions
+    (params) => placeActions.searchPlaceIndexForSuggestions(params, locationClient)
   );
 
   server.registerTool(
@@ -269,7 +314,7 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
         language: z.string().optional().describe('Language code'),
       },
     },
-    placeActions.getPlace
+    (params) => placeActions.getPlace(params, locationClient)
   );
 
   // Register Routes API tools
@@ -284,7 +329,7 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
         distanceUnit: z.enum(['Kilometers', 'Miles']).optional(),
       },
     },
-    routeActions.calculateRoute
+    (params) => routeActions.calculateRoute(params, locationClient)
   );
 
   server.registerTool(
@@ -299,10 +344,126 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
         departureTime: z.string().optional(),
       },
     },
-    routeActions.calculateRouteMatrix
+    (params) => routeActions.calculateRouteMatrix(params, locationClient)
   );
 
   return server;
+}
+
+// =============================================================================
+// Per-request MCP handler
+// =============================================================================
+
+async function handleMcpRequest(
+  req: Request,
+  res: Response,
+  credentials: ResolvedCredentials,
+): Promise<void> {
+  // Track tool calls
+  if (req.body?.method === 'tools/call' && req.body?.params?.name) {
+    trackToolCall(req.body.params.name, req);
+  }
+
+  const mcpServer = createMcpServer(credentials);
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    void transport.close();
+    void mcpServer.close();
+  };
+
+  res.once('finish', cleanup);
+  res.once('close', cleanup);
+
+  try {
+    await mcpServer.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    cleanup();
+
+    if (error instanceof HttpError) {
+      if (!res.headersSent) {
+        res.status(error.status).json({ error: error.code, message: error.message });
+      }
+      return;
+    }
+
+    console.error('Unhandled MCP HTTP error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'internal_error', message: 'Unexpected server error' });
+    }
+  }
+}
+
+// =============================================================================
+// Discovery handler (no credentials needed)
+// =============================================================================
+
+async function handleDiscoveryRequest(req: Request, res: Response): Promise<void> {
+  console.log(`[DEBUG] Handling discovery request: ${req.body?.method}`);
+
+  const demoServer = new McpServer({
+    name: 'grabmaps-mcp',
+    version: SERVER_VERSION,
+    capabilities: {
+      resources: {},
+      tools: {},
+      prompts: {},
+      logging: {}
+    }
+  });
+
+  // Register all tools for discovery (demo versions)
+  demoServer.tool('searchPlaceIndexForText', 'Search for places using text query. GrabMaps supports 8 Southeast Asian countries: Malaysia, Singapore, Thailand, Myanmar, Cambodia, Vietnam, Philippines, Indonesia.', {}, async () => ({
+    content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+  }));
+  demoServer.tool('searchPlaceIndexForPosition', 'Search for places by coordinates (reverse geocoding). Supports Southeast Asia only.', {}, async () => ({
+    content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+  }));
+  demoServer.tool('searchPlaceIndexForSuggestions', 'Get place suggestions based on partial text input. Supports Southeast Asia only.', {}, async () => ({
+    content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+  }));
+  demoServer.tool('getPlace', 'Get place details by place ID. Supports Southeast Asia only.', {}, async () => ({
+    content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+  }));
+  demoServer.tool('calculateRoute', 'Calculate a route between two points. Supports Car, Truck, Walking, Bicycle, Motorcycle modes.', {}, async () => ({
+    content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+  }));
+  demoServer.tool('calculateRouteMatrix', 'Calculate route matrix between multiple origins and destinations.', {}, async () => ({
+    content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
+  }));
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    void transport.close();
+    void demoServer.close();
+  };
+
+  res.once('finish', cleanup);
+  res.once('close', cleanup);
+
+  try {
+    await demoServer.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    cleanup();
+    console.error('Discovery request error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'internal_error', message: 'Discovery request failed' });
+    }
+  }
 }
 
 // ============================================================================
@@ -314,6 +475,7 @@ IMPORTANT INSTRUCTION FOR AI MODELS:
  */
 app.get('/.well-known/mcp/server-card.json', (req: Request, res: Response) => {
   trackRequest(req, '/.well-known/mcp/server-card.json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json({
     name: 'grabmaps-mcp',
     version: SERVER_VERSION,
@@ -329,14 +491,13 @@ app.get('/.well-known/mcp/server-card.json', (req: Request, res: Response) => {
       prompts: true
     },
     authentication: {
-      type: 'query-params',
-      params: [
-        { name: 'grabMapsApiKey', required: true, description: 'Your GrabMaps API key' },
-        { name: 'awsAccessKeyId', required: true, description: 'Your AWS Access Key ID' },
-        { name: 'awsSecretAccessKey', required: true, description: 'Your AWS Secret Access Key' },
-        { name: 'awsRegion', required: false, description: 'AWS Region (default: ap-southeast-5)' }
-      ]
-    }
+      type: 'api-key',
+      description: 'Provide your usr_XXXXXXXX API key via query param or URL path',
+      options: {
+        queryParam: '/mcp?api_key=usr_XXXXXXXX',
+        path: '/mcp/usr_XXXXXXXX',
+      },
+    },
   });
 });
 
@@ -349,33 +510,15 @@ app.get('/.well-known/mcp-config', (req: Request, res: Response) => {
     schema: {
       type: 'object',
       properties: {
-        grabMapsApiKey: {
+        api_key: {
           type: 'string',
-          description: 'Your GrabMaps API key',
-          title: 'GrabMaps API Key',
-          format: 'password'
+          description: 'Your MCP Key Service API key (starts with usr_)',
+          title: 'API Key',
+          format: 'password',
         },
-        awsAccessKeyId: {
-          type: 'string',
-          description: 'Your AWS Access Key ID',
-          title: 'AWS Access Key ID',
-          format: 'password'
-        },
-        awsSecretAccessKey: {
-          type: 'string',
-          description: 'Your AWS Secret Access Key',
-          title: 'AWS Secret Access Key',
-          format: 'password'
-        },
-        awsRegion: {
-          type: 'string',
-          description: 'AWS Region',
-          title: 'AWS Region',
-          default: 'ap-southeast-5'
-        }
       },
-      required: ['grabMapsApiKey', 'awsAccessKeyId', 'awsSecretAccessKey']
-    }
+      required: ['api_key'],
+    },
   });
 });
 
@@ -389,21 +532,20 @@ app.get('/', (req: Request, res: Response) => {
     version: SERVER_VERSION,
     description: 'MCP server for GrabMaps API (Places & Routes)',
     transport: 'streamable-http',
+    authentication: 'MCP Key Service (usr_XXXXXXXX)',
     usage: {
-      mcpUrl: 'https://mcp.techmavie.digital/grabmaps/mcp?grabMapsApiKey=YOUR_KEY&awsAccessKeyId=YOUR_AWS_KEY&awsSecretAccessKey=YOUR_AWS_SECRET',
-      parameters: {
-        grabMapsApiKey: 'Your GrabMaps API key (required)',
-        awsAccessKeyId: 'Your AWS Access Key ID (required)',
-        awsSecretAccessKey: 'Your AWS Secret Access Key (required)',
-        awsRegion: 'AWS Region (optional, default: ap-southeast-5)',
-      }
+      queryParam: '/mcp?api_key=usr_XXXXXXXX',
+      path: '/mcp/usr_XXXXXXXX',
     },
     endpoints: {
       health: '/health',
-      mcp: '/mcp?grabMapsApiKey=...&awsAccessKeyId=...&awsSecretAccessKey=...',
+      mcp: '/mcp?api_key=usr_XXXXXXXX',
+      mcpPath: '/mcp/usr_XXXXXXXX',
       analytics: '/analytics',
       dashboard: '/analytics/dashboard',
+      discovery: '/.well-known/mcp/server-card.json',
     },
+    keyServiceStatus: isKeyServiceEnabled() ? 'configured' : 'not configured',
     supportedCountries: ['Malaysia (MYS)', 'Singapore (SGP)', 'Thailand (THA)', 'Myanmar (MMR)', 'Cambodia (KHM)', 'Vietnam (VNM)', 'Philippines (PHL)', 'Indonesia (IDN)'],
     uptime: formatUptime(Date.now() - serverStartTime),
   });
@@ -766,120 +908,118 @@ app.get('/analytics/dashboard', (req: Request, res: Response) => {
   res.type('html').send(html);
 });
 
+// =============================================================================
+// MCP endpoints — per-request isolation
+// =============================================================================
+
 /**
- * MCP endpoint - Handles MCP requests with per-user credentials
+ * Hosted key-service mode: /mcp/:userKey
+ * Must be registered BEFORE /mcp to avoid Express matching usr_ as a query.
+ */
+app.all('/mcp/:userKey', async (req: Request, res: Response) => {
+  trackRequest(req, normalizeRouteForAnalytics(req));
+
+  try {
+    if (!isKeyServiceEnabled()) {
+      res.status(503).json({ error: 'service_unavailable', message: 'Key service not configured on this server.' });
+      return;
+    }
+
+    const userKey = req.params.userKey;
+    if (!userKey.startsWith('usr_')) {
+      res.status(403).json({ error: 'invalid_key', message: 'API key must start with usr_' });
+      return;
+    }
+
+    const result = await resolveKeyCredentials(userKey);
+    if (!result.ok) {
+      const status = result.reason === 'invalid_key' ? 403 : 503;
+      const message = result.reason === 'invalid_key'
+        ? 'Invalid or expired API key.'
+        : result.reason === 'malformed_response'
+          ? 'Authentication service returned incomplete credentials.'
+          : 'Authentication service temporarily unavailable. Try again later.';
+      res.status(status).json({ error: result.reason, message });
+      return;
+    }
+
+    console.log(`[grabmaps-mcp] Resolved user key ${userKey.substring(0, 12)}...`);
+    await handleMcpRequest(req, res, result.credentials);
+  } catch (error) {
+    if (error instanceof HttpError && !res.headersSent) {
+      res.status(error.status).json({ error: error.code, message: error.message });
+    } else if (!res.headersSent) {
+      console.error('MCP request error:', error);
+      res.status(500).json({ error: 'internal_error', message: 'Unexpected error' });
+    }
+  }
+});
+
+/**
+ * MCP endpoint: /mcp
+ * Supports ?api_key=usr_... query param and discovery requests.
  */
 app.all('/mcp', async (req: Request, res: Response) => {
   trackRequest(req, '/mcp');
-  
-  try {
-    // Extract credentials from query parameters
-    const grabMapsApiKey = req.query.grabMapsApiKey as string;
-    const awsAccessKeyId = req.query.awsAccessKeyId as string;
-    const awsSecretAccessKey = req.query.awsSecretAccessKey as string;
-    const awsRegion = req.query.awsRegion as string | undefined;
 
-    // Handle Smithery discovery/scanning requests (no credentials)
-    // Smithery sends POST with MCP initialize/tools/list methods to discover server capabilities
-    // We create a temporary demo server to handle these requests without real credentials
-    const hasCredentials = grabMapsApiKey && awsAccessKeyId && awsSecretAccessKey;
+  try {
+    // Check for hosted key-service query param
+    const hostedUserKey = getHostedUserKeyFromQuery(req);
+
+    // Detect discovery requests (Smithery scanning, no credentials)
     const mcpMethod = req.body?.method;
-    const isDiscoveryRequest = !hasCredentials && mcpMethod && (
+    const isDiscovery = !hostedUserKey && mcpMethod && (
       mcpMethod === 'initialize' ||
       mcpMethod === 'tools/list' ||
       mcpMethod === 'resources/list' ||
       mcpMethod === 'prompts/list' ||
       mcpMethod === 'notifications/initialized'
     );
-    
-    if (isDiscoveryRequest) {
-      // Create a demo MCP server for discovery (no real GrabMaps connection)
-      console.log(`[DEBUG] Handling discovery request: ${mcpMethod}`);
-      
-      const demoServer = new McpServer({
-        name: 'grabmaps-mcp',
-        version: SERVER_VERSION,
-        capabilities: {
-          resources: {},
-          tools: {},
-          prompts: {},
-          logging: {}
-        }
-      });
-      
-      // Register all tools for discovery (demo versions)
-      demoServer.tool('searchPlaceIndexForText', 'Search for places using text query. GrabMaps supports 8 Southeast Asian countries: Malaysia, Singapore, Thailand, Myanmar, Cambodia, Vietnam, Philippines, Indonesia.', {}, async () => ({
-        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
-      }));
-      demoServer.tool('searchPlaceIndexForPosition', 'Search for places by coordinates (reverse geocoding). Supports Southeast Asia only.', {}, async () => ({
-        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
-      }));
-      demoServer.tool('searchPlaceIndexForSuggestions', 'Get place suggestions based on partial text input. Supports Southeast Asia only.', {}, async () => ({
-        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
-      }));
-      demoServer.tool('getPlace', 'Get place details by place ID. Supports Southeast Asia only.', {}, async () => ({
-        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
-      }));
-      demoServer.tool('calculateRoute', 'Calculate a route between two points. Supports Car, Truck, Walking, Bicycle, Motorcycle modes.', {}, async () => ({
-        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
-      }));
-      demoServer.tool('calculateRouteMatrix', 'Calculate route matrix between multiple origins and destinations.', {}, async () => ({
-        content: [{ type: 'text', text: 'Demo: Requires GrabMaps credentials' }]
-      }));
-      
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
-      
-      res.on('close', () => {
-        transport.close();
-      });
-      
-      await demoServer.connect(transport);
-      await transport.handleRequest(req, res, req.body);
+
+    if (isDiscovery) {
+      await handleDiscoveryRequest(req, res);
       return;
     }
 
-    // Validate required credentials for actual MCP requests
-    if (!grabMapsApiKey || !awsAccessKeyId || !awsSecretAccessKey) {
+    if (hostedUserKey) {
+      // Hosted key-service via ?api_key=usr_...
+      if (!isKeyServiceEnabled()) {
+        res.status(503).json({ error: 'service_unavailable', message: 'Key service not configured on this server.' });
+        return;
+      }
+
+      const result = await resolveKeyCredentials(hostedUserKey);
+      if (!result.ok) {
+        const status = result.reason === 'invalid_key' ? 403 : 503;
+        const message = result.reason === 'invalid_key'
+          ? 'Invalid or expired API key.'
+          : result.reason === 'malformed_response'
+            ? 'Authentication service returned incomplete credentials.'
+            : 'Authentication service temporarily unavailable. Try again later.';
+        res.status(status).json({ error: result.reason, message });
+        return;
+      }
+
+      console.log(`[grabmaps-mcp] Resolved user key ${hostedUserKey.substring(0, 12)}...`);
+      await handleMcpRequest(req, res, result.credentials);
+    } else {
+      // No credentials provided and not a discovery request
       res.status(400).json({
-        error: 'Missing required parameters',
-        message: 'Please provide GrabMaps and AWS credentials via query parameters',
-        required: ['grabMapsApiKey', 'awsAccessKeyId', 'awsSecretAccessKey'],
-        optional: ['awsRegion'],
-        example: '/mcp?grabMapsApiKey=YOUR_KEY&awsAccessKeyId=YOUR_AWS_KEY&awsSecretAccessKey=YOUR_AWS_SECRET',
+        error: 'missing_auth',
+        message: 'Provide a usr_XXXXXXXX API key to authenticate.',
+        usage: {
+          queryParam: '/mcp?api_key=usr_XXXXXXXX',
+          path: '/mcp/usr_XXXXXXXX',
+        },
       });
-      return;
     }
-
-    // Log credential usage (masked)
-    console.log(`[grabmaps-mcp] Using credentials: grabMapsApiKey=${grabMapsApiKey.substring(0, 8)}..., awsAccessKeyId=${awsAccessKeyId.substring(0, 8)}...`);
-
-    // Create MCP server with user credentials
-    const mcpServer = createMcpServer({
-      grabMapsApiKey,
-      awsAccessKeyId,
-      awsSecretAccessKey,
-      awsRegion,
-    });
-
-    // Create transport and handle request
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    });
-
-    // Connect server to transport
-    await mcpServer.connect(transport);
-
-    // Handle the request
-    await transport.handleRequest(req, res, req.body);
-
   } catch (error) {
-    console.error('MCP request error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
+    if (error instanceof HttpError && !res.headersSent) {
+      res.status(error.status).json({ error: error.code, message: error.message });
+    } else if (!res.headersSent) {
+      console.error('MCP request error:', error);
+      res.status(500).json({ error: 'internal_error', message: 'Unexpected error' });
+    }
   }
 });
 
@@ -890,8 +1030,10 @@ app.all('/mcp', async (req: Request, res: Response) => {
 app.listen(PORT, HOST, () => {
   console.log(`
 🚀 ${SERVER_NAME} (HTTP) running on http://${HOST}:${PORT}
-   Health: http://${HOST}:${PORT}/health
-   MCP:    http://${HOST}:${PORT}/mcp?grabMapsApiKey=...&awsAccessKeyId=...&awsSecretAccessKey=...
+   Health:      http://${HOST}:${PORT}/health
+   MCP (query): http://${HOST}:${PORT}/mcp?api_key=usr_XXXXXXXX
+   MCP (path):  http://${HOST}:${PORT}/mcp/usr_XXXXXXXX
+   Key Service: ${isKeyServiceEnabled() ? 'configured' : 'NOT configured'}
 
 📍 Supported Countries: Malaysia, Singapore, Thailand, Myanmar, Cambodia, Vietnam, Philippines, Indonesia
 `);

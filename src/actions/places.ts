@@ -1,4 +1,5 @@
-import { 
+import {
+  LocationClient,
   SearchPlaceIndexForTextCommand,
   SearchPlaceIndexForPositionCommand,
   SearchPlaceIndexForSuggestionsCommand,
@@ -60,9 +61,9 @@ const formatPlace = (place: ExtendedPlace) => {
 // Places Actions implementation
 export const placeActions = {
   // Search for places by text query
-  searchPlaceIndexForText: async (params: SearchPlaceParams) => {
+  searchPlaceIndexForText: async (params: SearchPlaceParams, injectedClient?: LocationClient) => {
     try {
-      const client = createLocationClient();
+      const client = injectedClient || createLocationClient();
       const placeIndex = getPlaceIndexName();
       
       const { query, country, maxResults = 10, language } = params;
@@ -116,9 +117,9 @@ export const placeActions = {
   },
   
   // Search for places by position (reverse geocoding)
-  searchPlaceIndexForPosition: async (params: SearchByPositionParams) => {
+  searchPlaceIndexForPosition: async (params: SearchByPositionParams, injectedClient?: LocationClient) => {
     try {
-      const client = createLocationClient();
+      const client = injectedClient || createLocationClient();
       const placeIndex = getPlaceIndexName();
       
       const { longitude, latitude, maxResults = 10, language } = params;
@@ -150,9 +151,9 @@ export const placeActions = {
   },
   
   // Get place suggestions based on partial text input
-  searchPlaceIndexForSuggestions: async (params: SearchSuggestionsParams) => {
+  searchPlaceIndexForSuggestions: async (params: SearchSuggestionsParams, injectedClient?: LocationClient) => {
     try {
-      const client = createLocationClient();
+      const client = injectedClient || createLocationClient();
       const placeIndex = getPlaceIndexName();
       
       const { query, country, maxResults = 10, language } = params;
@@ -201,9 +202,9 @@ export const placeActions = {
   },
   
   // Get place details by place ID
-  getPlace: async (params: GetPlaceParams) => {
+  getPlace: async (params: GetPlaceParams, injectedClient?: LocationClient) => {
     try {
-      const client = createLocationClient();
+      const client = injectedClient || createLocationClient();
       const placeIndex = getPlaceIndexName();
       
       const { placeId, language } = params;

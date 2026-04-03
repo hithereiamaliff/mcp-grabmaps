@@ -68,7 +68,7 @@ This is CRITICAL for returning accurate search results.`,
         language: z.string().optional().describe('Language code'),
       }
     },
-    placeActions.searchPlaceIndexForText
+    (params) => placeActions.searchPlaceIndexForText(params)
   );
 
   server.registerTool(
@@ -82,7 +82,7 @@ This is CRITICAL for returning accurate search results.`,
         language: z.string().optional().describe('Language code'),
       },
     },
-    placeActions.searchPlaceIndexForPosition
+    (params) => placeActions.searchPlaceIndexForPosition(params)
   );
 
   server.registerTool(
@@ -107,7 +107,7 @@ This is CRITICAL for returning accurate search results.`,
         language: z.string().optional().describe('Language code'),
       }
     },
-    placeActions.searchPlaceIndexForSuggestions
+    (params) => placeActions.searchPlaceIndexForSuggestions(params)
   );
 
   server.registerTool(
@@ -119,7 +119,7 @@ This is CRITICAL for returning accurate search results.`,
         language: z.string().optional().describe('Language code'),
       },
     },
-    placeActions.getPlace
+    (params) => placeActions.getPlace(params)
   );
 
   // Register Routes API tools
@@ -134,7 +134,7 @@ This is CRITICAL for returning accurate search results.`,
         distanceUnit: z.enum(['Kilometers', 'Miles']).optional(),
       },
     },
-    routeActions.calculateRoute
+    (params) => routeActions.calculateRoute(params)
   );
 
   type RouteMatrixParams = {
@@ -157,7 +157,7 @@ This is CRITICAL for returning accurate search results.`,
         departureTime: z.string().optional(),
       },
     },
-    routeActions.calculateRouteMatrix
+    (params) => routeActions.calculateRouteMatrix(params)
   );
 
   return server;

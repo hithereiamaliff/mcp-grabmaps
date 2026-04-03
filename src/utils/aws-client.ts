@@ -4,17 +4,19 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-// Create AWS Location client
-export const createLocationClient = (): LocationClient => {
-  // Note: For VPS deployment, credentials are set via query parameters in http-server.ts
-  // Don't validate here as they may not be in env vars yet
-  
+// Create AWS Location client.
+// When explicit credentials are provided (HTTP server path), they are used directly.
+// When omitted (Smithery path), falls back to process.env.
+export const createLocationClient = (creds?: {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region?: string;
+}): LocationClient => {
   return new LocationClient({
-    region: process.env.AWS_REGION || 'ap-southeast-5',
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-    }
+    region: creds?.region || process.env.AWS_REGION || 'ap-southeast-5',
+    credentials: creds
+      ? { accessKeyId: creds.accessKeyId, secretAccessKey: creds.secretAccessKey }
+      : { accessKeyId: process.env.AWS_ACCESS_KEY_ID!, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY! },
   });
 };
 

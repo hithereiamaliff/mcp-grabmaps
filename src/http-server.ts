@@ -73,6 +73,22 @@ let analytics: Analytics = {
   hourlyRequests: {},
 };
 
+/** Merge loaded data with safe defaults so no field is ever undefined. */
+function safeAnalytics(loaded: Partial<Analytics>): Analytics {
+  return {
+    serverStartTime: loaded.serverStartTime || new Date().toISOString(),
+    totalRequests: loaded.totalRequests || 0,
+    totalToolCalls: loaded.totalToolCalls || 0,
+    requestsByMethod: loaded.requestsByMethod || {},
+    requestsByEndpoint: loaded.requestsByEndpoint || {},
+    toolCalls: loaded.toolCalls || {},
+    recentToolCalls: loaded.recentToolCalls || [],
+    clientsByIp: loaded.clientsByIp || {},
+    clientsByUserAgent: loaded.clientsByUserAgent || {},
+    hourlyRequests: loaded.hourlyRequests || {},
+  };
+}
+
 // Ensure data directory exists
 function ensureDataDir(): void {
   if (!fs.existsSync(ANALYTICS_DATA_DIR)) {
@@ -87,11 +103,8 @@ function loadAnalytics(): void {
     ensureDataDir();
     if (fs.existsSync(ANALYTICS_FILE)) {
       const data = fs.readFileSync(ANALYTICS_FILE, 'utf-8');
-      const loaded = JSON.parse(data) as Analytics;
-      analytics = {
-        ...loaded,
-        serverStartTime: loaded.serverStartTime || new Date().toISOString(),
-      };
+      const loaded = JSON.parse(data) as Partial<Analytics>;
+      analytics = safeAnalytics(loaded);
       console.log(`📊 Loaded analytics from ${ANALYTICS_FILE}`);
       console.log(`   Total requests: ${analytics.totalRequests}`);
     } else {
@@ -160,7 +173,7 @@ async function initializeAnalytics() {
   if (firebaseAnalytics.isInitialized()) {
     const firebaseData = await firebaseAnalytics.loadAnalytics();
     if (firebaseData) {
-      analytics = firebaseData;
+      analytics = safeAnalytics(firebaseData);
       console.log('📊 Loaded analytics from Firebase');
       return;
     }

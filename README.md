@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/hithereiamaliff-mcp-grabmaps-badge.png)](https://mseep.ai/app/hithereiamaliff-mcp-grabmaps)
+
 # GrabMaps MCP Server
 
 A Model Context Protocol (MCP) server for GrabMaps API integration, providing access to GrabMaps services through AWS Location Service.
